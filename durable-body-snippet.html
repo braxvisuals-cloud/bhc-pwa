@@ -1,0 +1,23 @@
+<!--
+  Bush Hills Church of Christ - PWA Footer/Body snippet
+
+  NOT USED. Durable's Footer Code box should be left EMPTY.
+
+  This project originally tried to register a service worker (for offline
+  page caching) by inlining its source into a Blob and registering the
+  Blob URL from here, to work around Durable not allowing file uploads.
+  That approach does not work: browsers reject blob: and data: URLs for
+  service worker registration outright (confirmed by testing on the live
+  site - Chrome throws "The URL protocol of the script is not supported").
+
+  There is no client-side workaround for this. A real fix would require
+  serving sw.js as a genuine same-origin https:// file from
+  bushhillschurch.com itself - e.g. proxying the domain's DNS through a
+  Cloudflare Worker that serves /sw.js and lets everything else pass
+  through to Durable. That's a separate, larger project requiring DNS
+  access, out of scope here.
+
+  The installable home-screen app (manifest.json + icons, via the Head
+  snippet) does not depend on any of this and works without a service
+  worker. See README.md for details.
+-->

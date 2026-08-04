@@ -1,0 +1,120 @@
+<!--
+  Bush Hills Church of Christ - Live stream auto-embed + recent videos
+  Paste into: Durable > Website Settings > Integrations > Custom Code > Footer Code
+
+  On the /service-stream page only:
+  1. Asks the Cloudflare Worker whether the channel is live right now. If
+     yes, swaps the existing video iframe to the live video (normal
+     youtube.com/embed/VIDEO_ID format). If not, leaves the Video block's
+     current static video alone.
+  2. Renders a "Recent Videos" row of the channel's 3 latest uploads right
+     under the video. Clicking one plays it in the main player above
+     (stays on the site, no redirect to YouTube), and reveals a "Back to
+     Live Stream" / "Back to Main Video" button that restores whatever was
+     playing originally - no page refresh needed.
+-->
+<script>
+(function () {
+  if (window.location.pathname !== '/service-stream') return;
+
+  var WORKER_URL = 'https://bhcoclivecheck-98db.braxvisuals.workers.dev/';
+  var originalSrc = null;
+  var wasLive = false;
+  var backButton = null;
+
+  function swapLiveVideo(data) {
+    if (!data || !data.isLive || !data.videoId) return;
+    var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
+    if (!iframe) return;
+    var liveEmbedSrc = 'https://www.youtube.com/embed/' + data.videoId + '?autoplay=1';
+    if (iframe.src !== liveEmbedSrc) iframe.src = liveEmbedSrc;
+    wasLive = true;
+  }
+
+  function playInMainPlayer(videoId) {
+    var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
+    if (!iframe) return;
+    iframe.src = 'https://www.youtube.com/embed/' + videoId + '?autoplay=1';
+    iframe.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (backButton) backButton.style.display = 'inline-block';
+  }
+
+  function goBackToOriginal() {
+    var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
+    if (!iframe || !originalSrc) return;
+    iframe.src = originalSrc;
+    iframe.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (backButton) backButton.style.display = 'none';
+  }
+
+  function renderRecentVideos(videos) {
+    if (!videos || !videos.length) return;
+
+    var existing = document.getElementById('bhcoc-recent-videos');
+    if (existing) existing.remove();
+
+    var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
+    var videoSection = iframe ? iframe.closest('section') : null;
+    if (!videoSection || !videoSection.parentElement) return;
+
+    var wrap = document.createElement('div');
+    wrap.id = 'bhcoc-recent-videos';
+    wrap.style.cssText = 'max-width:1100px; margin:0 auto; padding:32px 16px;';
+
+    var headingRow = document.createElement('div');
+    headingRow.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:16px; flex-wrap:wrap; margin-bottom:16px;';
+
+    var heading = document.createElement('h3');
+    heading.textContent = 'Recent Videos';
+    heading.style.cssText = 'font-size:20px; font-weight:700; margin:0;';
+    headingRow.appendChild(heading);
+
+    backButton = document.createElement('button');
+    backButton.type = 'button';
+    backButton.textContent = wasLive ? '← Back to Live Stream' : '← Back to Main Video';
+    backButton.style.cssText = 'display:none; padding:6px 14px; border-radius:9999px; border:1px solid currentColor; background:none; cursor:pointer; font-size:13px; font-weight:600; color:inherit;';
+    backButton.addEventListener('click', goBackToOriginal);
+    headingRow.appendChild(backButton);
+
+    wrap.appendChild(headingRow);
+
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:16px; flex-wrap:wrap; justify-content:center;';
+
+    videos.forEach(function (v) {
+      var card = document.createElement('button');
+      card.type = 'button';
+      card.style.cssText = 'display:block; width:280px; max-width:100%; text-align:left; background:none; border:none; padding:0; cursor:pointer; font:inherit; color:inherit;';
+
+      var img = document.createElement('img');
+      img.src = v.thumbnail;
+      img.alt = v.title;
+      img.style.cssText = 'width:100%; border-radius:8px; display:block;';
+
+      var title = document.createElement('div');
+      title.textContent = v.title;
+      title.style.cssText = 'margin-top:8px; font-size:14px; font-weight:600; line-height:1.3;';
+
+      card.appendChild(img);
+      card.appendChild(title);
+      card.addEventListener('click', function () { playInMainPlayer(v.videoId); });
+      row.appendChild(card);
+    });
+
+    wrap.appendChild(row);
+    videoSection.parentElement.insertBefore(wrap, videoSection.nextSibling);
+  }
+
+  fetch(WORKER_URL)
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      swapLiveVideo(data);
+      var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
+      originalSrc = iframe ? iframe.src : null;
+      renderRecentVideos(data && data.recentVideos);
+    })
+    .catch(function () {
+      // Fail silently - leave the page exactly as Durable rendered it.
+    });
+})();
+</script>
