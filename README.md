@@ -1,11 +1,12 @@
 # Bush Hills Church of Christ — Website Automation Projects
 
-This folder covers two related projects built on top of [bushhillschurch.com](https://bushhillschurch.com/) (a Durable site):
+This folder covers three related projects built on top of [bushhillschurch.com](https://bushhillschurch.com/) (a Durable site):
 
 1. **PWA install** — the site can be installed as an app icon on phone home screens (Android Chrome and iOS Safari).
 2. **Live stream automation** — the `/service-stream` page automatically shows the church's YouTube livestream when it's live, a waiting-music video when it's not, and a self-updating "Recent Videos" section. No more manually pasting a link every Sunday.
+3. **Announcements** — a backend that takes a rough-draft announcement, cleans up the phrasing with AI, publishes it, and emails a one-click delete link as a moderation safety net. Backend is fully built and tested; the frontend (a submission form + a feed on the site) is written but not yet wired into Durable.
 
-**Status: both fully deployed and working.**
+**Status: PWA and live-stream automation fully deployed and working. Announcements backend fully working; frontend integration still pending.**
 
 Durable allows custom code injection (a Head Code box and a Footer Code box, under Website Settings → Integrations → Custom Code) but does not allow uploading arbitrary files to its own root, and page-editor blocks (Video, "Embed object with code") turned out to silently mangle certain URLs. Everything here works around those two constraints.
 
@@ -24,6 +25,10 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
 | `ios-install-banner-snippet.html` | **In use.** One of the scripts in Durable's Footer Code box (see below). |
 | `live-stream/worker.js` | **In use, deployed to Cloudflare.** The live-check + recent-videos backend. |
 | `live-stream/durable-footer-snippet.html` | **In use.** The other script in Durable's Footer Code box. |
+| `announcements/schema.sql` | Run once in D1's Console to create the `announcements` table. |
+| `announcements/worker.js` | **In use, deployed to Cloudflare.** The announcements backend (AI cleanup, storage, email, delete). |
+| `announcements/durable-submission-form-snippet.html` | **Not yet in Durable.** The write-up form for posting a new announcement. |
+| `announcements/durable-footer-feed-snippet.html` | **Not yet in Durable.** Renders the public announcements feed. |
 
 ## Where everything is actually deployed
 
@@ -44,6 +49,12 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
 
 **Video block on `/service-stream`**: set to whatever static "waiting music" video should show when nothing's live — currently *"Christian Lofi Mix Vol 1" by Gospel Hydration* (`https://www.youtube.com/watch?v=0tk6MUyEuTk`). This is a normal Durable edit, change it anytime; the automation only overrides it when the channel is actually live.
 
+**Cloudflare Worker** (announcements backend): `https://fragrant-dream-ef85.braxvisuals.workers.dev`, same account.
+- Bindings: D1 database named `DB` → `announcements-db`; Workers AI named `AI`.
+- Secrets: `SUBMIT_PIN` (shared passphrase for posting), `RESEND_API_KEY` (from resend.com).
+- To redeploy: open the Worker → Edit code → paste in updated `announcements/worker.js` → Deploy.
+- No caching layer on this one (unlike the live-stream Worker) — code changes take effect on the very next request.
+
 ## Branding used
 
 The site itself is minimal (plain white header, black text, no CSS brand color defined in the page). The one piece of real branding is the site's own favicon/logo — a "bhcoc" wordmark with a cross over a copper/rust curtain background. That image is reused as the app icon, and its copper tone (`#7A3E1D`) was sampled from it for `theme_color` and the iOS install banner's background. `background_color` is plain white to match the site.
@@ -61,6 +72,21 @@ The Footer Code script (`live-stream/durable-footer-snippet.html`), on `/service
 - If nothing's live, does nothing — the Video block's static "waiting music" video just plays as normal.
 
 **Why the Worker exists at all** instead of doing this client-side: Durable's page-editor blocks (Video block, "Embed object with code") both turned out to silently rewrite/strip any YouTube URL that isn't a plain `watch?v=`/`embed/VIDEO_ID` link — including dropping query strings entirely. That broke every attempt at a URL-only trick. The Worker sidesteps this by doing the real lookup server-side and only ever handing Durable a plain, well-formed embed URL.
+
+## How the announcements feature works
+
+The Worker (`announcements/worker.js`) has three endpoints:
+- `POST /submit` — takes `{ text, pin }`. Rejects if `pin` doesn't match the `SUBMIT_PIN` secret. Otherwise: runs `text` through Workers AI (`@cf/zai-org/glm-4.7-flash`) with a prompt that cleans up grammar/phrasing while preserving every fact, date, and name; saves both the raw and cleaned text to D1 with a random `delete_token`; emails a one-click delete link to `NOTIFY_EMAIL`; publishes immediately (no approval queue).
+- `GET /delete/:token` — the link in that email. Marks the announcement `deleted` in D1 (soft delete, not removed from the table).
+- `GET /list` — returns the 10 most recent `active` announcements as JSON, for the site's feed to render.
+
+**Design choice worth knowing:** this publishes immediately and relies on the delete-email as an *after-the-fact* moderation safety net, not a pre-publish approval gate. The `SUBMIT_PIN` requirement keeps random internet traffic from posting, but anyone who has the PIN can publish instantly. If stricter moderation is ever wanted, `handleSubmit` would need to insert with `status: 'pending'` instead of `'active'` and add an approve step.
+
+**AI model note:** `@cf/meta/llama-3.1-8b-instruct` (the original choice) turned out to be deprecated as of 2026-05-30, and its replacement `@cf/meta/llama-3.2-3b-instruct` was *also* deprecated — Workers AI's Llama lineup was apparently deprecated wholesale around that date. Currently using `@cf/zai-org/glm-4.7-flash` instead, which returns OpenAI-style responses (`choices[0].message.content`) rather than the Llama family's simpler `.response` field — `cleanUpText()` in the Worker checks both shapes so it degrades gracefully if the model changes again.
+
+**Email note:** `NOTIFY_EMAIL` is currently `braxvisuals@gmail.com`, not the church's actual desired address, because Resend's free tier (sending from the shared `onboarding@resend.dev` domain) only allows delivery to the account's own verified email. To notify a different address for real, verify a custom domain at resend.com/domains and update both `NOTIFY_EMAIL` and the `from` address in `sendDeleteEmail`.
+
+**What's left:** the two frontend snippets in `announcements/` need to actually go into Durable. Suggested placement: the submission form on a private/unlinked page (not the homepage, so it's not stumbled into — the PIN is a backstop, not the only line of defense) and the feed `<div id="bhcoc-announcements-feed"></div>` wherever announcements should show, likely the homepage. Neither has been pasted into Durable yet.
 
 ## What didn't work: offline page caching (separate from live-stream)
 
