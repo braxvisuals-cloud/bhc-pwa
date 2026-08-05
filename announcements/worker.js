@@ -1,6 +1,10 @@
 // Bush Hills Church of Christ - Announcements backend (Cloudflare Worker)
 //
-// Three endpoints, all CORS-scoped to bushhillschurch.com:
+// Four endpoints, all CORS-scoped to bushhillschurch.com:
+//   POST /check-pin - { pin } -> { valid: true/false }. Used by the
+//                    submission page to unlock the form before showing
+//                    it, so the page can be publicly linked without
+//                    exposing a working form to casual visitors.
 //   POST /submit  - { text, pin } -> AI-cleans the text, saves it, emails
 //                    a one-click delete link, publishes it immediately.
 //   GET  /delete/:token - moderation safety net, marks an announcement
@@ -77,6 +81,23 @@ async function sendDeleteEmail(env, cleanedText, deleteURL) {
         '<blockquote>' + cleanedText.replace(/\n/g, '<br>') + '</blockquote>' +
         '<p><a href="' + deleteURL + '">Click here to remove it</a> if it shouldn\'t be there.</p>',
     }),
+  });
+}
+
+async function handleCheckPin(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return new Response(JSON.stringify({ valid: false }), {
+      status: 400,
+      headers: corsHeaders({ 'Content-Type': 'application/json' }),
+    });
+  }
+
+  const valid = (body.pin || '') === env.SUBMIT_PIN;
+  return new Response(JSON.stringify({ valid: valid }), {
+    headers: corsHeaders({ 'Content-Type': 'application/json' }),
   });
 }
 
@@ -165,6 +186,9 @@ export default {
     const url = new URL(request.url);
 
     try {
+      if (request.method === 'POST' && url.pathname === '/check-pin') {
+        return await handleCheckPin(request, env);
+      }
       if (request.method === 'POST' && url.pathname === '/submit') {
         return await handleSubmit(request, env);
       }

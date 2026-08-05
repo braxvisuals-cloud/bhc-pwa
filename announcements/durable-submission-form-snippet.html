@@ -1,35 +1,73 @@
 <!--
-  Bush Hills Church of Christ - Announcement submission form
-  Suggested placement: an "Embed object with code" block on a private/
-  unlinked page (e.g. /announcements-admin), NOT the public homepage -
-  so it's not something random visitors stumble into. Anyone with the
-  page URL still needs the PIN to actually submit.
+  Bush Hills Church of Christ - Announcement submission form (PIN-gated)
+  Placement: an "Embed object with code" block on the /announcements page.
 
-  Replace WORKER_URL_HERE and the PIN prompt stays client-side only for
-  UX; the real check happens server-side in the Worker.
+  Shows ONLY a PIN box on load. Entering the correct PIN (checked against
+  the Worker's /check-pin endpoint) reveals the actual write-up form; the
+  PIN doesn't need to be re-entered at submit time since it's already
+  been verified. Because the real form is hidden until unlocked, it's
+  fine for this page to be linked/discoverable again (e.g. a footer link)
+  - there's nothing for a casual visitor to see or use.
 -->
 <div style="max-width:500px; margin:0 auto; padding:24px;">
-  <textarea id="bhcoc-announce-text" rows="6" placeholder="Write the announcement, rough is fine - AI will clean up the phrasing." style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc; font:inherit; box-sizing:border-box;"></textarea>
-  <input id="bhcoc-announce-pin" type="password" placeholder="PIN" style="width:100%; margin-top:8px; padding:12px; border-radius:8px; border:1px solid #ccc; font:inherit; box-sizing:border-box;">
-  <button id="bhcoc-announce-submit" type="button" style="margin-top:8px; padding:12px 20px; border-radius:8px; border:none; background:#7A3E1D; color:#fff; font-weight:600; cursor:pointer;">Post Announcement</button>
-  <div id="bhcoc-announce-status" style="margin-top:8px; font-size:14px;"></div>
+
+  <div id="bhcoc-gate">
+    <p style="text-align:center; margin-bottom:12px;">Enter PIN to post an announcement</p>
+    <input id="bhcoc-gate-pin" type="password" placeholder="PIN" style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc; font:inherit; box-sizing:border-box;">
+    <button id="bhcoc-gate-submit" type="button" style="margin-top:8px; width:100%; padding:12px 20px; border-radius:8px; border:none; background:#7A3E1D; color:#fff; font-weight:600; cursor:pointer;">Unlock</button>
+    <div id="bhcoc-gate-status" style="margin-top:8px; font-size:14px; text-align:center;"></div>
+  </div>
+
+  <div id="bhcoc-form" style="display:none;">
+    <textarea id="bhcoc-announce-text" rows="6" placeholder="Write the announcement, rough is fine - AI will clean up the phrasing." style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc; font:inherit; box-sizing:border-box;"></textarea>
+    <button id="bhcoc-announce-submit" type="button" style="margin-top:8px; padding:12px 20px; border-radius:8px; border:none; background:#7A3E1D; color:#fff; font-weight:600; cursor:pointer;">Post Announcement</button>
+    <div id="bhcoc-announce-status" style="margin-top:8px; font-size:14px;"></div>
+  </div>
+
 </div>
 <script>
 (function () {
-  var WORKER_URL = 'https://fragrant-dream-ef85.braxvisuals.workers.dev/submit';
+  var WORKER_BASE = 'https://fragrant-dream-ef85.braxvisuals.workers.dev';
+  var verifiedPin = null;
+
+  var gate = document.getElementById('bhcoc-gate');
+  var form = document.getElementById('bhcoc-form');
+  var gateStatus = document.getElementById('bhcoc-gate-status');
+
+  document.getElementById('bhcoc-gate-submit').addEventListener('click', function () {
+    var pin = document.getElementById('bhcoc-gate-pin').value;
+    if (!pin) { gateStatus.textContent = 'Enter a PIN first.'; return; }
+
+    gateStatus.textContent = 'Checking...';
+    fetch(WORKER_BASE + '/check-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: pin }),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data.valid) {
+          gateStatus.textContent = 'Incorrect PIN.';
+          return;
+        }
+        verifiedPin = pin;
+        gate.style.display = 'none';
+        form.style.display = 'block';
+      })
+      .catch(function () { gateStatus.textContent = 'Network error - try again.'; });
+  });
 
   document.getElementById('bhcoc-announce-submit').addEventListener('click', function () {
     var text = document.getElementById('bhcoc-announce-text').value.trim();
-    var pin = document.getElementById('bhcoc-announce-pin').value;
     var status = document.getElementById('bhcoc-announce-status');
 
     if (!text) { status.textContent = 'Write something first.'; return; }
 
     status.textContent = 'Posting...';
-    fetch(WORKER_URL, {
+    fetch(WORKER_BASE + '/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, pin: pin }),
+      body: JSON.stringify({ text: text, pin: verifiedPin }),
     })
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (result) {
@@ -39,7 +77,6 @@
         }
         status.textContent = 'Posted! Cleaned version: "' + result.data.cleanedText + '"';
         document.getElementById('bhcoc-announce-text').value = '';
-        document.getElementById('bhcoc-announce-pin').value = '';
       })
       .catch(function () { status.textContent = 'Network error - try again.'; });
   });
