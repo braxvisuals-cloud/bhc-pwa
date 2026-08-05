@@ -12,15 +12,21 @@
      (stays on the site, no redirect to YouTube), and reveals a "Back to
      Live Stream" / "Back to Main Video" button that restores whatever was
      playing originally - no page refresh needed.
+
+  Durable's site is a Next.js single-page app - clicking nav links doesn't
+  reload the page, it swaps content in place. So this script polls the
+  current URL and adds/removes the Recent Videos section as you navigate
+  to and away from /service-stream, instead of only checking once on
+  initial load (which left it stuck on-screen when navigating elsewhere).
 -->
 <script>
 (function () {
-  if (window.location.pathname !== '/service-stream') return;
-
   var WORKER_URL = 'https://bhcoclivecheck-98db.braxvisuals.workers.dev/';
   var originalSrc = null;
   var wasLive = false;
   var backButton = null;
+  var cachedData = null;
+  var lastPath = null;
 
   function swapLiveVideo(data) {
     if (!data || !data.isLive || !data.videoId) return;
@@ -47,11 +53,16 @@
     if (backButton) backButton.style.display = 'none';
   }
 
+  function removeRecentVideos() {
+    var existing = document.getElementById('bhcoc-recent-videos');
+    if (existing) existing.remove();
+    backButton = null;
+  }
+
   function renderRecentVideos(videos) {
     if (!videos || !videos.length) return;
 
-    var existing = document.getElementById('bhcoc-recent-videos');
-    if (existing) existing.remove();
+    removeRecentVideos();
 
     var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
     var videoSection = iframe ? iframe.closest('section') : null;
@@ -105,16 +116,39 @@
     videoSection.parentElement.insertBefore(wrap, videoSection.nextSibling);
   }
 
-  fetch(WORKER_URL)
-    .then(function (res) { return res.json(); })
-    .then(function (data) {
+  function enterServiceStreamPage() {
+    wasLive = false;
+    originalSrc = null;
+
+    function applyData(data) {
+      cachedData = data;
       swapLiveVideo(data);
       var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
       originalSrc = iframe ? iframe.src : null;
       renderRecentVideos(data && data.recentVideos);
-    })
-    .catch(function () {
-      // Fail silently - leave the page exactly as Durable rendered it.
-    });
+    }
+
+    fetch(WORKER_URL)
+      .then(function (res) { return res.json(); })
+      .then(applyData)
+      .catch(function () {
+        // Fail silently - leave the page exactly as Durable rendered it.
+      });
+  }
+
+  function syncToCurrentPage() {
+    var path = window.location.pathname;
+    if (path === lastPath) return;
+    lastPath = path;
+
+    if (path === '/service-stream') {
+      enterServiceStreamPage();
+    } else {
+      removeRecentVideos();
+    }
+  }
+
+  syncToCurrentPage();
+  setInterval(syncToCurrentPage, 500);
 })();
 </script>
