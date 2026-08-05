@@ -1,13 +1,15 @@
 <!--
-  Bush Hills Church of Christ - Announcements feed
+  Bush Hills Church of Christ - Announcements feed (rotating strip)
   Paste into: Durable > Website Settings > Integrations > Custom Code > Footer Code
   (add as an ADDITIONAL script alongside the live-stream and iOS-banner
   scripts already there - do not replace them)
 
-  Renders a list of active announcements wherever an element with
-  id="bhcoc-announcements-feed" exists on the page (add an empty
-  <div id="bhcoc-announcements-feed"></div> via an Embed/HTML block
-  wherever you want the feed to show, e.g. the homepage). If that div
+  Renders a compact single-line strip wherever an element with
+  id="bhcoc-announcements-feed" exists on the page (an empty
+  <div id="bhcoc-announcements-feed"></div> added via an Embed/HTML
+  block). Shows one announcement at a time, fading to the next every 6
+  seconds - like a small reel instead of a stacked list. If only one
+  announcement exists, it just displays it with no rotation. If that div
   isn't present on the current page, this script does nothing.
 -->
 <script>
@@ -16,29 +18,39 @@
   if (!target) return;
 
   var WORKER_URL = 'https://fragrant-dream-ef85.braxvisuals.workers.dev/list';
+  var ROTATE_MS = 6000;
+
+  target.style.cssText = 'max-width:700px; margin:0 auto; padding:14px 20px; min-height:24px; display:flex; align-items:center; justify-content:center; text-align:center;';
+
+  var textEl = document.createElement('div');
+  textEl.style.cssText = 'font-size:15px; line-height:1.4; transition:opacity 0.5s ease; opacity:1;';
+  target.appendChild(textEl);
 
   fetch(WORKER_URL)
     .then(function (res) { return res.json(); })
     .then(function (data) {
       var announcements = (data && data.announcements) || [];
-      if (!announcements.length) return;
 
-      announcements.forEach(function (a) {
-        var card = document.createElement('div');
-        card.style.cssText = 'padding:16px; border-radius:8px; background:#f5f0e8; margin-bottom:12px;';
+      if (!announcements.length) {
+        textEl.textContent = 'No announcements right now — check back soon!';
+        textEl.style.color = '#888';
+        textEl.style.fontSize = '14px';
+        return;
+      }
 
-        var text = document.createElement('div');
-        text.textContent = a.cleaned_text;
-        text.style.cssText = 'font-size:15px; line-height:1.5;';
-        card.appendChild(text);
+      var index = 0;
+      textEl.textContent = announcements[0].cleaned_text;
 
-        var date = document.createElement('div');
-        date.textContent = new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        date.style.cssText = 'font-size:12px; color:#888; margin-top:6px;';
-        card.appendChild(date);
-
-        target.appendChild(card);
-      });
+      if (announcements.length > 1) {
+        setInterval(function () {
+          textEl.style.opacity = '0';
+          setTimeout(function () {
+            index = (index + 1) % announcements.length;
+            textEl.textContent = announcements[index].cleaned_text;
+            textEl.style.opacity = '1';
+          }, 500);
+        }, ROTATE_MS);
+      }
     })
     .catch(function () {});
 })();

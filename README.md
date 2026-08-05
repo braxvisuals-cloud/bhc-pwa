@@ -43,9 +43,14 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
 
 **Durable** (Website Settings → Integrations → Custom Code):
 - **Head Code**: contents of `durable-head-snippet.html`.
-- **Footer Code**: contains **two** separate `<script>` blocks, both required:
+- **Footer Code**: contains **three** separate `<script>` blocks, all required, in this order:
   1. `live-stream/durable-footer-snippet.html` (live-stream swap + recent videos)
   2. `ios-install-banner-snippet.html` (iOS install banner)
+  3. `announcements/durable-footer-feed-snippet.html` (announcements ticker)
+
+  **Gotcha:** this box has gone from "all three present" to "only one present" more than once — pasting a *replacement* for one script into this box, instead of appending it alongside the other two, wipes the others out silently (no error, they just stop running). Always paste the **full combined set of all three** as the entire Footer Code contents, never just one in isolation, unless you've first confirmed the other two are still there.
+- **Homepage**: has an "Embed object with code" block containing just `<div id="bhcoc-announcements-feed"></div>` (no script — the script lives in Footer Code and finds this div).
+- **`/announcements`**: a page with an "Embed object with code" block containing the submission form (`announcements/durable-submission-form-snippet.html`), linked from a footer "Admin" link. Not private/unlinked as originally suggested — anyone can find the page, but the PIN still gates actual submission.
 
 **Video block on `/service-stream`**: set to whatever static "waiting music" video should show when nothing's live — currently *"Christian Lofi Mix Vol 1" by Gospel Hydration* (`https://www.youtube.com/watch?v=0tk6MUyEuTk`). This is a normal Durable edit, change it anytime; the automation only overrides it when the channel is actually live.
 
