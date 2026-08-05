@@ -53,6 +53,7 @@
         verifiedPin = pin;
         gate.style.display = 'none';
         form.style.display = 'block';
+        if (window.bhcocTrack) window.bhcocTrack('announcement_pin_unlocked');
       })
       .catch(function () { gateStatus.textContent = 'Network error - try again.'; });
   });
@@ -77,6 +78,7 @@
         }
         status.textContent = 'Posted! Cleaned version: "' + result.data.cleanedText + '"';
         document.getElementById('bhcoc-announce-text').value = '';
+        if (window.bhcocTrack) window.bhcocTrack('announcement_posted');
       })
       .catch(function () { status.textContent = 'Network error - try again.'; });
   });

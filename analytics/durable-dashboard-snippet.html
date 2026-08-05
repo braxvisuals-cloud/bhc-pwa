@@ -1,0 +1,110 @@
+<!--
+  Bush Hills Church of Christ - Usage dashboard (PIN-gated)
+  Placement: an "Embed object with code" block on a new page, e.g.
+  /admin/analytics (put it wherever makes sense in your admin folder).
+
+  Shows only a PIN box until unlocked (same pattern as the announcements
+  page), then displays total events, activity in the last 7 days, page
+  views by path, and a breakdown of tracked feature-usage events - all
+  as simple bar-style rows, no charting library needed.
+-->
+<div style="max-width:700px; margin:0 auto; padding:24px;">
+
+  <div id="bhcoc-dash-gate">
+    <p style="text-align:center; margin-bottom:12px;">Enter PIN to view usage dashboard</p>
+    <input id="bhcoc-dash-pin" type="password" placeholder="PIN" style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc; font:inherit; box-sizing:border-box;">
+    <button id="bhcoc-dash-submit" type="button" style="margin-top:8px; width:100%; padding:12px 20px; border-radius:8px; border:none; background:#7A3E1D; color:#fff; font-weight:600; cursor:pointer;">Unlock</button>
+    <div id="bhcoc-dash-status" style="margin-top:8px; font-size:14px; text-align:center;"></div>
+  </div>
+
+  <div id="bhcoc-dash-content" style="display:none;">
+    <div style="display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:140px; background:#f5f0e8; border-radius:8px; padding:16px; text-align:center;">
+        <div id="bhcoc-dash-total" style="font-size:28px; font-weight:700;">-</div>
+        <div style="font-size:13px; color:#888;">Total events (all time)</div>
+      </div>
+      <div style="flex:1; min-width:140px; background:#f5f0e8; border-radius:8px; padding:16px; text-align:center;">
+        <div id="bhcoc-dash-recent" style="font-size:28px; font-weight:700;">-</div>
+        <div style="font-size:13px; color:#888;">Events, last 7 days</div>
+      </div>
+    </div>
+
+    <h3 style="font-size:18px; margin-bottom:8px;">Page Views by Page</h3>
+    <div id="bhcoc-dash-pages" style="margin-bottom:24px;"></div>
+
+    <h3 style="font-size:18px; margin-bottom:8px;">Feature Usage</h3>
+    <div id="bhcoc-dash-events"></div>
+  </div>
+
+</div>
+<script>
+(function () {
+  var WORKER_BASE = 'https://winter-salad-5a99.braxvisuals.workers.dev';
+
+  var gate = document.getElementById('bhcoc-dash-gate');
+  var content = document.getElementById('bhcoc-dash-content');
+  var status = document.getElementById('bhcoc-dash-status');
+
+  var EVENT_LABELS = {
+    pageview: 'Page views',
+    live_swap_triggered: 'Live stream auto-swapped',
+    recent_video_clicked: 'Recent video clicked',
+    ios_banner_shown: 'iOS install banner shown',
+    ios_banner_dismissed: 'iOS install banner dismissed',
+    announcement_pin_unlocked: 'Announcement form unlocked',
+    announcement_posted: 'Announcements posted',
+  };
+
+  function renderBars(container, rows, labelFn) {
+    container.innerHTML = '';
+    if (!rows.length) {
+      container.textContent = 'No data yet.';
+      container.style.color = '#888';
+      return;
+    }
+    var max = Math.max.apply(null, rows.map(function (r) { return r.count; }));
+    rows.forEach(function (r) {
+      var row = document.createElement('div');
+      row.style.cssText = 'margin-bottom:10px;';
+
+      var labelRow = document.createElement('div');
+      labelRow.style.cssText = 'display:flex; justify-content:space-between; font-size:14px; margin-bottom:3px;';
+      labelRow.innerHTML = '<span>' + labelFn(r) + '</span><span style="font-weight:600;">' + r.count + '</span>';
+      row.appendChild(labelRow);
+
+      var barBg = document.createElement('div');
+      barBg.style.cssText = 'background:#eee; border-radius:4px; height:8px; overflow:hidden;';
+      var barFill = document.createElement('div');
+      barFill.style.cssText = 'background:#7A3E1D; height:100%; width:' + Math.max(4, (r.count / max) * 100) + '%;';
+      barBg.appendChild(barFill);
+      row.appendChild(barBg);
+
+      container.appendChild(row);
+    });
+  }
+
+  document.getElementById('bhcoc-dash-submit').addEventListener('click', function () {
+    var pin = document.getElementById('bhcoc-dash-pin').value;
+    if (!pin) { status.textContent = 'Enter a PIN first.'; return; }
+
+    status.textContent = 'Loading...';
+    fetch(WORKER_BASE + '/stats?pin=' + encodeURIComponent(pin))
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) {
+          status.textContent = result.data.error || 'Incorrect PIN.';
+          return;
+        }
+        gate.style.display = 'none';
+        content.style.display = 'block';
+
+        document.getElementById('bhcoc-dash-total').textContent = result.data.totalEvents;
+        document.getElementById('bhcoc-dash-recent').textContent = result.data.last7Days;
+
+        renderBars(document.getElementById('bhcoc-dash-pages'), result.data.pageviewsByPath, function (r) { return r.path; });
+        renderBars(document.getElementById('bhcoc-dash-events'), result.data.eventsByType, function (r) { return EVENT_LABELS[r.event_name] || r.event_name; });
+      })
+      .catch(function () { status.textContent = 'Network error - try again.'; });
+  });
+})();
+</script>

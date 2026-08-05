@@ -33,9 +33,11 @@
   closeBtn.addEventListener('click', function () {
     banner.remove();
     localStorage.setItem('bhcoc-install-banner-dismissed', '1');
+    if (window.bhcocTrack) window.bhcocTrack('ios_banner_dismissed');
   });
   banner.appendChild(closeBtn);
 
   document.body.appendChild(banner);
+  if (window.bhcocTrack) window.bhcocTrack('ios_banner_shown');
 })();
 </script>

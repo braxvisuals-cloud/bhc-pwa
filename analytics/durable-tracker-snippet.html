@@ -1,0 +1,39 @@
+<!--
+  Bush Hills Church of Christ - Usage tracker
+  Paste into: Durable > Website Settings > Integrations > Custom Code > Footer Code
+  MUST come FIRST in the Footer Code box, before the other scripts - it
+  defines window.bhcocTrack(), which the live-stream, iOS-banner, and
+  announcements scripts call to log feature-usage events.
+
+  Tracks a "pageview" event on every page, and polls the URL (same
+  SPA-navigation-aware pattern as the live-stream script) so it correctly
+  logs a new pageview when navigating between pages without a full reload.
+-->
+<script>
+(function () {
+  var WORKER_URL = 'https://winter-salad-5a99.braxvisuals.workers.dev/track';
+  var lastPath = null;
+
+  window.bhcocTrack = function (eventName, path) {
+    if (window.location.hostname !== 'bushhillschurch.com') return;
+    try {
+      fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: eventName, path: path || window.location.pathname }),
+        keepalive: true,
+      }).catch(function () {});
+    } catch (e) {}
+  };
+
+  function trackPageview() {
+    var path = window.location.pathname;
+    if (path === lastPath) return;
+    lastPath = path;
+    window.bhcocTrack('pageview', path);
+  }
+
+  trackPageview();
+  setInterval(trackPageview, 500);
+})();
+</script>
