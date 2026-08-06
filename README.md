@@ -25,6 +25,7 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
 | `durable-body-snippet.html`, `sw.js` | **Not in use.** Dead-end offline-caching attempt, kept as reference — see below. |
 | `ios-install-banner-snippet.html` | **In use.** One of the scripts in Durable's Footer Code box (see below). |
 | `dashboard-snippet.html` | **In use.** The hidden dashboard's content — paste into a new, unlisted `/dashboard` page in Durable. |
+| `sermon-notes-snippet.html` | **In use.** Sermon notes (localStorage) + Bible verse lookup — paste into a new, unlisted `/notes` page in Durable, linked from the dashboard's "Sermon Notes" tile. |
 | `pwa-dashboard-router-snippet.html` | **In use.** One of the scripts in Durable's Footer Code box — routes installed-app launches to `/dashboard` (see below). |
 | `footer-code-combined.html` | **Use this one for pasting.** All four Footer Code scripts already glued together in order — copy this whole file into Footer Code instead of assembling the four by hand. |
 | `live-stream/worker.js` | **In use, deployed to Cloudflare.** The live-check + recent-videos backend. |
@@ -59,6 +60,7 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
 - **Homepage**: has an "Embed object with code" block containing just `<div id="bhcoc-announcements-feed"></div>` (no script — the script lives in Footer Code and finds this div).
 - **`/announcements`**: a page with an "Embed object with code" block containing the submission form (`announcements/durable-submission-form-snippet.html`), linked from a footer "Admin" link. Not private/unlinked as originally suggested — anyone can find the page, but the PIN still gates actual submission.
 - **`/dashboard`**: a new page, **removed from the main nav menu** (unlisted — reachable by direct URL but not linked from anywhere a normal visitor would browse), with an "Embed object with code" block containing `dashboard-snippet.html`. This is the hidden app screen — see below.
+- **`/notes`**: another new, unlisted page (same treatment as `/dashboard`), with an "Embed object with code" block containing `sermon-notes-snippet.html`. Linked from the dashboard's "Sermon Notes" tile; the floating ⌂ button (from the router script) gets you back.
 
 **Video block on `/service-stream`**: set to whatever static "waiting music" video should show when nothing's live — currently *"Christian Lofi Mix Vol 1" by Gospel Hydration* (`https://www.youtube.com/watch?v=0tk6MUyEuTk`). This is a normal Durable edit, change it anytime; the automation only overrides it when the channel is actually live.
 
@@ -95,6 +97,8 @@ The goal: opening the installed app should show a dashboard screen instead of th
 - `dashboard-snippet.html` is the dashboard page itself — a quick-links grid, live-stream status (reuses the live-stream Worker), and a mini announcements feed (reuses the announcements Worker's `/list` endpoint). Its "Browse full site →" link goes to `/?app_full=1`; that query param tells the router script to stop redirecting `/` back to the dashboard for the rest of that app session, so browsing the real site from there behaves normally.
 - The dashboard is "hidden" the same way `/announcements` is: it's a real, unlisted page — not linked from the nav, so normal visitors never stumble onto it. Someone who guesses the URL directly in a browser would still see it (there's no PIN gate here, unlike `/announcements`); what `display-mode` detection actually prevents is normal visitors ever landing there automatically, since the router script only redirects `/` when running inside the installed app.
 
+**Sermon Notes & Bible (`/notes`):** a second unlisted page, linked from the dashboard's "Sermon Notes" tile. Verse of the Day and verse lookup both call [bible-api.com](https://bible-api.com) directly (free, no key, CORS-enabled) — no Worker needed since this is a plain `fetch()` call, not a Durable video/embed block that mangles URLs. Sermon notes (create/edit/delete) are stored in the browser's `localStorage` under the key `bhcoc-sermon-notes-v1` — there's no account system in this project, so notes are private to that one device and don't sync between a phone and an iPad, but that also means zero setup, no server cost, and it still works with no signal.
+
 ## How the announcements feature works
 
 The Worker (`announcements/worker.js`) has three endpoints:
@@ -125,6 +129,8 @@ Installability doesn't need a service worker at all — confirmed working on bot
 **iOS install banner:** visit in Safari on an iPhone/iPad that hasn't installed the app yet — a copper banner should slide in at the bottom pointing to Share → Add to Home Screen. Dismissing it (✕) is remembered via `localStorage` and won't reappear. Shows to iOS Safari only — never Android, desktop, or Chrome/Firefox-on-iOS, and never once the app is actually installed.
 
 **Hidden dashboard:** open the app from its home-screen icon (not a browser tab) — it should land directly on the dashboard (quick links, live status, announcements), not the normal homepage. Tap "Browse full site →" and confirm it drops into the real homepage without bouncing back. Browse to another page (e.g. Give) and confirm the floating ⌂ button appears and returns to the dashboard when tapped. Separately, visit `bushhillschurch.com/` in a normal browser tab (Safari/Chrome, not the installed app) and confirm nothing has changed — no redirect, no floating button, normal homepage as always.
+
+**Sermon Notes & Bible:** from the dashboard, tap "Sermon Notes" → should land on `/notes` with a Verse of the Day already loaded. Try looking up a reference (e.g. "Psalm 23"). Tap "+ New Note", type something in the title and body, then fully close and reopen the app (or just reload the page) — the note should still be there, confirming it actually persisted to `localStorage` and not just in-memory.
 
 **Live stream:** the real test is an actual Sunday service — start streaming as normal, then check `/service-stream` within ~5 minutes (the Worker's cache window); it should swap over with zero manual action. Can also be sanity-checked anytime by temporarily pointing the Worker's `CHANNEL_ID` at a known always-live channel (e.g. Lofi Girl, `UCSJ4gkVC6NrvII8umztf0Ow`) to visually confirm the swap mechanism still works, then switching it back.
 

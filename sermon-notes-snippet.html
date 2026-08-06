@@ -1,0 +1,423 @@
+<!--
+  Bush Hills Church of Christ - Sermon Notes & Bible
+  Placement: an "Embed object with code" block on a NEW Durable page at
+  path /notes. Create the page, remove it from the main nav menu
+  (unlisted, same treatment as /dashboard and /announcements), and paste
+  this as the page's only content block. Linked from the dashboard's
+  "Sermon Notes" tile.
+
+  Three pieces, all client-side, no backend:
+  - Verse of the Day: picks a reference from a small rotating list based
+    on the day of the year, fetches its text from bible-api.com (free,
+    no API key, CORS-enabled).
+  - Look up a verse: same API, user-entered reference.
+  - Sermon notes: create/edit/delete notes stored in the browser's
+    localStorage. Private to the device - there's no account system in
+    this project, so notes don't sync between phone/tablet, but that
+    also means zero setup and it works offline.
+-->
+<div id="bhcoc-notes">
+<style>
+  #bhcoc-notes {
+    --copper: #7A3E1D;
+    --copper-dark: #56290F;
+    --copper-soft: rgba(122, 62, 29, 0.08);
+    --paper: #FAF7F2;
+    --card: #FFFFFF;
+    --ink: #2B2420;
+    --ink-muted: #8A7F73;
+    --line: #ECE4D8;
+
+    box-sizing: border-box;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: max(28px, env(safe-area-inset-top)) 18px calc(56px + env(safe-area-inset-bottom));
+  }
+  #bhcoc-notes *, #bhcoc-notes *::before, #bhcoc-notes *::after {
+    box-sizing: border-box;
+  }
+  #bhcoc-notes .bhcoc-n-header {
+    text-align: center;
+    margin-bottom: 22px;
+  }
+  #bhcoc-notes .bhcoc-n-title {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 21px;
+    font-weight: 700;
+    margin: 0;
+  }
+  #bhcoc-notes .bhcoc-n-tagline {
+    font-size: 13px;
+    color: var(--ink-muted);
+    margin: 5px 0 0;
+    font-style: italic;
+  }
+
+  #bhcoc-notes .bhcoc-n-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 2px rgba(43, 36, 32, 0.04);
+  }
+  #bhcoc-notes .bhcoc-n-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    margin: 0 0 12px;
+    color: var(--copper-dark);
+  }
+  #bhcoc-notes .bhcoc-n-card-title svg {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+  }
+
+  #bhcoc-notes .bhcoc-n-votd {
+    background: linear-gradient(135deg, var(--copper) 0%, var(--copper-dark) 100%);
+    color: #fff;
+  }
+  #bhcoc-notes .bhcoc-n-votd .bhcoc-n-card-title { color: rgba(255,255,255,0.8); }
+  #bhcoc-notes .bhcoc-n-votd-text {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.5;
+    font-style: italic;
+    margin: 0 0 8px;
+  }
+  #bhcoc-notes .bhcoc-n-votd-ref {
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+
+  #bhcoc-notes .bhcoc-n-lookup-row {
+    display: flex;
+    gap: 8px;
+  }
+  #bhcoc-notes .bhcoc-n-lookup-input {
+    flex: 1;
+    padding: 11px 13px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--paper);
+  }
+  #bhcoc-notes .bhcoc-n-lookup-btn {
+    padding: 11px 16px;
+    border-radius: 10px;
+    border: none;
+    background: var(--copper);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  #bhcoc-notes .bhcoc-n-lookup-btn:active { transform: scale(0.96); }
+  #bhcoc-notes .bhcoc-n-lookup-result {
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-muted);
+  }
+  #bhcoc-notes .bhcoc-n-lookup-result .bhcoc-n-verse-text {
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-style: italic;
+    font-size: 15px;
+  }
+  #bhcoc-notes .bhcoc-n-lookup-result .bhcoc-n-verse-ref {
+    display: block;
+    margin-top: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--copper-dark);
+    font-style: normal;
+  }
+
+  #bhcoc-notes .bhcoc-n-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  #bhcoc-notes .bhcoc-n-new-btn {
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1.5px solid var(--copper);
+    background: none;
+    color: var(--copper);
+    font-weight: 700;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  #bhcoc-notes .bhcoc-n-new-btn:active { transform: scale(0.96); }
+  #bhcoc-notes .bhcoc-n-empty {
+    font-size: 13.5px;
+    color: var(--ink-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 18px 0;
+  }
+  #bhcoc-notes .bhcoc-n-note {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  #bhcoc-notes .bhcoc-n-note:last-child { margin-bottom: 0; }
+  #bhcoc-notes .bhcoc-n-note-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  #bhcoc-notes .bhcoc-n-note-title {
+    flex: 1;
+    border: none;
+    background: none;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+    padding: 4px 2px;
+  }
+  #bhcoc-notes .bhcoc-n-note-title:focus { outline: none; border-bottom: 1px solid var(--line); }
+  #bhcoc-notes .bhcoc-n-note-date {
+    font-size: 11.5px;
+    color: var(--ink-muted);
+    white-space: nowrap;
+  }
+  #bhcoc-notes .bhcoc-n-note-delete {
+    border: none;
+    background: none;
+    color: var(--ink-muted);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  #bhcoc-notes .bhcoc-n-note-body {
+    width: 100%;
+    min-height: 70px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--paper);
+    resize: vertical;
+  }
+  #bhcoc-notes .bhcoc-n-note-body:focus { outline: none; border-color: var(--copper); }
+</style>
+
+  <header class="bhcoc-n-header">
+    <h1 class="bhcoc-n-title">Sermon Notes &amp; Bible</h1>
+    <p class="bhcoc-n-tagline">Take it in, write it down, look it up</p>
+  </header>
+
+  <section class="bhcoc-n-card bhcoc-n-votd">
+    <h2 class="bhcoc-n-card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.3S4 4 7.5 4 12 5.3 12 5.3v14.4S10 18.4 7.5 18.4 2 19.7 2 19.7V5.3z"/><path d="M22 5.3S20 4 16.5 4 12 5.3 12 5.3v14.4s2-1.3 4.5-1.3 5.5 1.3 5.5 1.3V5.3z"/></svg>
+      Verse of the Day
+    </h2>
+    <p class="bhcoc-n-votd-text" id="bhcoc-votd-text">Loading…</p>
+    <div class="bhcoc-n-votd-ref" id="bhcoc-votd-ref"></div>
+  </section>
+
+  <section class="bhcoc-n-card">
+    <h2 class="bhcoc-n-card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
+      Look Up a Verse
+    </h2>
+    <div class="bhcoc-n-lookup-row">
+      <input id="bhcoc-lookup-input" class="bhcoc-n-lookup-input" type="text" placeholder="e.g. John 3:16">
+      <button id="bhcoc-lookup-btn" class="bhcoc-n-lookup-btn" type="button">Search</button>
+    </div>
+    <div id="bhcoc-lookup-result" class="bhcoc-n-lookup-result"></div>
+  </section>
+
+  <section class="bhcoc-n-card">
+    <div class="bhcoc-n-list-header">
+      <h2 class="bhcoc-n-card-title" style="margin:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V4.5A1.5 1.5 0 0 1 5.5 3H16l4 4v12.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5z"/><path d="M16 3v4h4"/><path d="M8 12h8M8 16h5"/></svg>
+        My Sermon Notes
+      </h2>
+      <button id="bhcoc-note-new-btn" class="bhcoc-n-new-btn" type="button">+ New Note</button>
+    </div>
+    <div id="bhcoc-notes-list"></div>
+  </section>
+
+</div>
+<script>
+(function () {
+  var BIBLE_API = 'https://bible-api.com/';
+  var VOTD_REFS = [
+    'John 3:16', 'Psalm 23:1', 'Philippians 4:13', 'Romans 8:28',
+    'Jeremiah 29:11', 'Proverbs 3:5-6', 'Joshua 1:9', 'Isaiah 40:31',
+    'Matthew 11:28', '1 Corinthians 13:4-7', 'Psalm 46:1', 'Romans 12:2'
+  ];
+  var NOTES_KEY = 'bhcoc-sermon-notes-v1';
+
+  function dayOfYear(date) {
+    var start = new Date(date.getFullYear(), 0, 0);
+    var diff = date - start;
+    return Math.floor(diff / 86400000);
+  }
+
+  function fetchVerse(reference, onSuccess, onError) {
+    fetch(BIBLE_API + encodeURIComponent(reference))
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data || data.error || !data.text) { onError(); return; }
+        onSuccess(data);
+      })
+      .catch(onError);
+  }
+
+  var votdText = document.getElementById('bhcoc-votd-text');
+  var votdRef = document.getElementById('bhcoc-votd-ref');
+  var votdReference = VOTD_REFS[dayOfYear(new Date()) % VOTD_REFS.length];
+  fetchVerse(
+    votdReference,
+    function (data) {
+      votdText.textContent = '"' + data.text.trim().replace(/\s+/g, ' ') + '"';
+      votdRef.textContent = data.reference + (data.translation_name ? ' · ' + data.translation_name : '');
+    },
+    function () {
+      votdText.textContent = 'Verse unavailable right now.';
+      votdRef.textContent = '';
+    }
+  );
+
+  var lookupInput = document.getElementById('bhcoc-lookup-input');
+  var lookupBtn = document.getElementById('bhcoc-lookup-btn');
+  var lookupResult = document.getElementById('bhcoc-lookup-result');
+
+  function runLookup() {
+    var query = lookupInput.value.trim();
+    if (!query) return;
+    lookupResult.innerHTML = 'Searching…';
+    fetchVerse(
+      query,
+      function (data) {
+        lookupResult.innerHTML =
+          '<span class="bhcoc-n-verse-text">"' + data.text.trim().replace(/\s+/g, ' ') + '"</span>' +
+          '<span class="bhcoc-n-verse-ref">' + data.reference + (data.translation_name ? ' · ' + data.translation_name : '') + '</span>';
+      },
+      function () {
+        lookupResult.textContent = 'Couldn\'t find that reference - try a format like "John 3:16" or "Romans 8:28-30".';
+      }
+    );
+  }
+  lookupBtn.addEventListener('click', runLookup);
+  lookupInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') runLookup();
+  });
+
+  function loadNotes() {
+    try {
+      return JSON.parse(localStorage.getItem(NOTES_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function saveNotes(notes) {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+  }
+
+  var notesList = document.getElementById('bhcoc-notes-list');
+
+  function renderNotes() {
+    var notes = loadNotes();
+    notesList.innerHTML = '';
+
+    if (!notes.length) {
+      notesList.innerHTML = '<div class="bhcoc-n-empty">No notes yet - tap "+ New Note" to start one.</div>';
+      return;
+    }
+
+    notes.slice().reverse().forEach(function (note) {
+      var card = document.createElement('div');
+      card.className = 'bhcoc-n-note';
+
+      var row = document.createElement('div');
+      row.className = 'bhcoc-n-note-row';
+
+      var titleInput = document.createElement('input');
+      titleInput.className = 'bhcoc-n-note-title';
+      titleInput.value = note.title;
+      titleInput.addEventListener('input', function () {
+        updateNote(note.id, { title: titleInput.value });
+      });
+
+      var dateSpan = document.createElement('span');
+      dateSpan.className = 'bhcoc-n-note-date';
+      dateSpan.textContent = note.date;
+
+      var deleteBtn = document.createElement('button');
+      deleteBtn.className = 'bhcoc-n-note-delete';
+      deleteBtn.type = 'button';
+      deleteBtn.innerHTML = '&times;';
+      deleteBtn.setAttribute('aria-label', 'Delete note');
+      deleteBtn.addEventListener('click', function () {
+        if (!window.confirm('Delete this note?')) return;
+        saveNotes(loadNotes().filter(function (n) { return n.id !== note.id; }));
+        renderNotes();
+      });
+
+      row.appendChild(titleInput);
+      row.appendChild(dateSpan);
+      row.appendChild(deleteBtn);
+
+      var body = document.createElement('textarea');
+      body.className = 'bhcoc-n-note-body';
+      body.value = note.body;
+      body.placeholder = 'What stood out to you?';
+      body.addEventListener('input', function () {
+        updateNote(note.id, { body: body.value });
+      });
+
+      card.appendChild(row);
+      card.appendChild(body);
+      notesList.appendChild(card);
+    });
+  }
+
+  function updateNote(id, fields) {
+    var notes = loadNotes();
+    var note = notes.filter(function (n) { return n.id === id; })[0];
+    if (!note) return;
+    Object.keys(fields).forEach(function (key) { note[key] = fields[key]; });
+    saveNotes(notes);
+  }
+
+  document.getElementById('bhcoc-note-new-btn').addEventListener('click', function () {
+    var notes = loadNotes();
+    var now = new Date();
+    notes.push({
+      id: 'n' + now.getTime(),
+      title: now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+      date: now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+      body: ''
+    });
+    saveNotes(notes);
+    renderNotes();
+  });
+
+  renderNotes();
+})();
+</script>
