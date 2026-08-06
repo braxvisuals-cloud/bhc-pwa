@@ -2,7 +2,7 @@
   "name": "Bush Hills Church of Christ",
   "short_name": "Bush Hills CoC",
   "description": "The Friendliest Church on this side of Heaven — service times, live services, resources, and more from Bush Hills Church of Christ in Birmingham, Alabama.",
-  "start_url": "https://bushhillschurch.com/",
+  "start_url": "https://bushhillschurch.com/dashboard",
   "scope": "https://bushhillschurch.com/",
   "id": "https://bushhillschurch.com/",
   "display": "standalone",

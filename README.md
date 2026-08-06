@@ -1,12 +1,13 @@
 # Bush Hills Church of Christ — Website Automation Projects
 
-This folder covers three related projects built on top of [bushhillschurch.com](https://bushhillschurch.com/) (a Durable site):
+This folder covers four related projects built on top of [bushhillschurch.com](https://bushhillschurch.com/) (a Durable site):
 
 1. **PWA install** — the site can be installed as an app icon on phone home screens (Android Chrome and iOS Safari).
-2. **Live stream automation** — the `/service-stream` page automatically shows the church's YouTube livestream when it's live, a waiting-music video when it's not, and a self-updating "Recent Videos" section. No more manually pasting a link every Sunday.
-3. **Announcements** — a backend that takes a rough-draft announcement, cleans up the phrasing with AI, publishes it, and emails a one-click delete link as a moderation safety net. Backend is fully built and tested; the frontend (a submission form + a feed on the site) is written but not yet wired into Durable.
+2. **Hidden app dashboard** — when installed and launched from its home-screen icon, the app opens to a dedicated dashboard screen (live status, quick links, announcements) instead of the normal homepage. Visiting the site in a regular browser tab is completely unaffected — same site as always.
+3. **Live stream automation** — the `/service-stream` page automatically shows the church's YouTube livestream when it's live, a waiting-music video when it's not, and a self-updating "Recent Videos" section. No more manually pasting a link every Sunday.
+4. **Announcements** — a backend that takes a rough-draft announcement, cleans up the phrasing with AI, publishes it, and emails a one-click delete link as a moderation safety net. Backend is fully built and tested; the frontend (a submission form + a feed on the site) is written but not yet wired into Durable.
 
-**Status: PWA and live-stream automation fully deployed and working. Announcements backend fully working; frontend integration still pending.**
+**Status: PWA, hidden dashboard, and live-stream automation fully deployed and working. Announcements backend fully working; frontend integration still pending.**
 
 Durable allows custom code injection (a Head Code box and a Footer Code box, under Website Settings → Integrations → Custom Code) but does not allow uploading arbitrary files to its own root, and page-editor blocks (Video, "Embed object with code") turned out to silently mangle certain URLs. Everything here works around those two constraints.
 
@@ -23,6 +24,8 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
 | `durable-head-snippet.html` | **In use.** Paste into Durable's Head Code box. |
 | `durable-body-snippet.html`, `sw.js` | **Not in use.** Dead-end offline-caching attempt, kept as reference — see below. |
 | `ios-install-banner-snippet.html` | **In use.** One of the scripts in Durable's Footer Code box (see below). |
+| `dashboard-snippet.html` | **In use.** The hidden dashboard's content — paste into a new, unlisted `/dashboard` page in Durable. |
+| `pwa-dashboard-router-snippet.html` | **In use.** One of the scripts in Durable's Footer Code box — routes installed-app launches to `/dashboard` (see below). |
 | `live-stream/worker.js` | **In use, deployed to Cloudflare.** The live-check + recent-videos backend. |
 | `live-stream/durable-footer-snippet.html` | **In use.** The other script in Durable's Footer Code box. |
 | `announcements/schema.sql` | Run once in D1's Console to create the `announcements` table. |
@@ -43,14 +46,16 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
 
 **Durable** (Website Settings → Integrations → Custom Code):
 - **Head Code**: contents of `durable-head-snippet.html`.
-- **Footer Code**: contains **three** separate `<script>` blocks, all required, in this order:
+- **Footer Code**: contains **four** separate `<script>` blocks, all required, in this order:
   1. `live-stream/durable-footer-snippet.html` (live-stream swap + recent videos)
   2. `ios-install-banner-snippet.html` (iOS install banner)
   3. `announcements/durable-footer-feed-snippet.html` (announcements ticker)
+  4. `pwa-dashboard-router-snippet.html` (routes installed-app launches to the hidden dashboard)
 
-  **Gotcha:** this box has gone from "all three present" to "only one present" more than once — pasting a *replacement* for one script into this box, instead of appending it alongside the other two, wipes the others out silently (no error, they just stop running). Always paste the **full combined set of all three** as the entire Footer Code contents, never just one in isolation, unless you've first confirmed the other two are still there.
+  **Gotcha:** this box has gone from "all present" to "only one present" more than once — pasting a *replacement* for one script into this box, instead of appending it alongside the others, wipes the others out silently (no error, they just stop running). Always paste the **full combined set of all four** as the entire Footer Code contents, never just one in isolation, unless you've first confirmed the others are still there.
 - **Homepage**: has an "Embed object with code" block containing just `<div id="bhcoc-announcements-feed"></div>` (no script — the script lives in Footer Code and finds this div).
 - **`/announcements`**: a page with an "Embed object with code" block containing the submission form (`announcements/durable-submission-form-snippet.html`), linked from a footer "Admin" link. Not private/unlinked as originally suggested — anyone can find the page, but the PIN still gates actual submission.
+- **`/dashboard`**: a new page, **removed from the main nav menu** (unlisted — reachable by direct URL but not linked from anywhere a normal visitor would browse), with an "Embed object with code" block containing `dashboard-snippet.html`. This is the hidden app screen — see below.
 
 **Video block on `/service-stream`**: set to whatever static "waiting music" video should show when nothing's live — currently *"Christian Lofi Mix Vol 1" by Gospel Hydration* (`https://www.youtube.com/watch?v=0tk6MUyEuTk`). This is a normal Durable edit, change it anytime; the automation only overrides it when the channel is actually live.
 
@@ -77,6 +82,15 @@ The Footer Code script (`live-stream/durable-footer-snippet.html`), on `/service
 - If nothing's live, does nothing — the Video block's static "waiting music" video just plays as normal.
 
 **Why the Worker exists at all** instead of doing this client-side: Durable's page-editor blocks (Video block, "Embed object with code") both turned out to silently rewrite/strip any YouTube URL that isn't a plain `watch?v=`/`embed/VIDEO_ID` link — including dropping query strings entirely. That broke every attempt at a URL-only trick. The Worker sidesteps this by doing the real lookup server-side and only ever handing Durable a plain, well-formed embed URL.
+
+## How the hidden dashboard works
+
+The goal: opening the installed app should show a dashboard screen instead of the normal homepage, while a normal browser tab is completely unaffected. There's no way to serve genuinely different HTML per install-vs-browser (Durable serves the same page to everyone), so this is done client-side with the [`display-mode` media feature](https://developer.mozilla.org/en-US/docs/Web/Manifest/Reference/display) — `standalone` is true only when the page is running inside the installed app's own window, never in a regular browser tab.
+
+- `manifest.json`'s `start_url` points fresh installs straight at `/dashboard`.
+- `pwa-dashboard-router-snippet.html` (site-wide, in Footer Code) is the fallback and the "glue": if a standalone launch ever lands on `/` (e.g. an already-installed app whose `start_url` was baked in before this change), it silently swaps to `/dashboard`. It also adds a small floating ⌂ button on every other page, visible only in standalone mode, since the dashboard is meant to act as the app's home base and there's no address bar to navigate with otherwise.
+- `dashboard-snippet.html` is the dashboard page itself — a quick-links grid, live-stream status (reuses the live-stream Worker), and a mini announcements feed (reuses the announcements Worker's `/list` endpoint). Its "Browse full site →" link goes to `/?app_full=1`; that query param tells the router script to stop redirecting `/` back to the dashboard for the rest of that app session, so browsing the real site from there behaves normally.
+- The dashboard is "hidden" the same way `/announcements` is: it's a real, unlisted page — not linked from the nav, so normal visitors never stumble onto it. Someone who guesses the URL directly in a browser would still see it (there's no PIN gate here, unlike `/announcements`); what `display-mode` detection actually prevents is normal visitors ever landing there automatically, since the router script only redirects `/` when running inside the installed app.
 
 ## How the announcements feature works
 
@@ -107,6 +121,8 @@ Installability doesn't need a service worker at all — confirmed working on bot
 
 **iOS install banner:** visit in Safari on an iPhone/iPad that hasn't installed the app yet — a copper banner should slide in at the bottom pointing to Share → Add to Home Screen. Dismissing it (✕) is remembered via `localStorage` and won't reappear. Shows to iOS Safari only — never Android, desktop, or Chrome/Firefox-on-iOS, and never once the app is actually installed.
 
+**Hidden dashboard:** open the app from its home-screen icon (not a browser tab) — it should land directly on the dashboard (quick links, live status, announcements), not the normal homepage. Tap "Browse full site →" and confirm it drops into the real homepage without bouncing back. Browse to another page (e.g. Give) and confirm the floating ⌂ button appears and returns to the dashboard when tapped. Separately, visit `bushhillschurch.com/` in a normal browser tab (Safari/Chrome, not the installed app) and confirm nothing has changed — no redirect, no floating button, normal homepage as always.
+
 **Live stream:** the real test is an actual Sunday service — start streaming as normal, then check `/service-stream` within ~5 minutes (the Worker's cache window); it should swap over with zero manual action. Can also be sanity-checked anytime by temporarily pointing the Worker's `CHANNEL_ID` at a known always-live channel (e.g. Lofi Girl, `UCSJ4gkVC6NrvII8umztf0Ow`) to visually confirm the swap mechanism still works, then switching it back.
 
 ## Troubleshooting
@@ -116,5 +132,7 @@ Installability doesn't need a service worker at all — confirmed working on bot
 - **Manifest/icons not loading at all** → check Netlify's Visitor Access setting isn't re-enabled (causes a 401 on every file).
 - **iOS still showing a stale icon after a fix** → old installs cache the icon per-domain; remove the home screen icon, clear Safari's website data for `bushhillschurch.com` (Settings → Safari → Advanced → Website Data), then revisit and re-add.
 - **Android app stuck on an old icon after a fix** → Chrome bakes the icon into a signed package (WebAPK) at install time, which doesn't auto-refresh. Fully uninstall (long-press → Uninstall, not just remove from home screen) and reinstall.
+- **Installed app still opens to the normal homepage instead of the dashboard** → most likely `pwa-dashboard-router-snippet.html` isn't in Footer Code (or got wiped out by a later "replace" paste — see the Footer Code gotcha above), or the `/dashboard` page doesn't exist/isn't published yet. Android's WebAPK also bakes `start_url` in at install time like it does the icon, so an already-installed app may need the router script's fallback rather than the manifest change alone — check Footer Code first.
+- **Floating ⌂ button shows up in a normal browser tab** → shouldn't happen; it's gated on `display-mode: standalone`/`navigator.standalone`. If it does, check nothing else on the site is forcing a standalone display mode, and confirm you're testing in an actual browser tab, not a previously-installed app window.
 - **Live-stream/recent-videos changes not showing up** → almost always the Worker's 5-minute cache serving a stale response from before the change. Wait it out, or temporarily comment out the `if (cached) {...}` block in `worker.js`, deploy, and check the Worker URL directly to confirm the new code is correct before re-enabling the cache.
 - **Worker returning `isLive:false` unexpectedly** → check `env.YOUTUBE_API_KEY` is actually set (case-sensitive name) in Cloudflare's Settings → Variables and Secrets, and hasn't hit its daily quota.

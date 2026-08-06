@@ -1,0 +1,85 @@
+<!--
+  Bush Hills Church of Christ - Hidden PWA dashboard
+  Placement: an "Embed object with code" block on a NEW Durable page at
+  path /dashboard. Create the page in Durable's editor, remove it from the
+  main nav menu (unlisted, same treatment as /announcements), and paste
+  this as the page's only content block.
+
+  This page exists only to be the installed app's home screen.
+  pwa-dashboard-router-snippet.html (pasted into Footer Code) is what
+  routes installed-app launches here automatically and leaves normal
+  browser visitors alone - this page itself has no routing logic, it's
+  just the screen that gets shown.
+-->
+<div id="bhcoc-dashboard" style="max-width:640px; margin:0 auto; padding:24px 16px 96px; font-family:sans-serif; color:#222;">
+
+  <div style="text-align:center; margin-bottom:24px;">
+    <img src="https://marvelous-halva-940fc1.netlify.app/icons/icon-192.png" alt="Bush Hills Church of Christ" style="width:72px; height:72px; border-radius:16px; margin-bottom:12px;">
+    <h1 style="font-size:22px; margin:0;">Bush Hills Church of Christ</h1>
+    <p style="color:#666; margin:4px 0 0;">The Friendliest Church on this side of Heaven</p>
+  </div>
+
+  <div id="bhcoc-dash-live" style="background:#7A3E1D; color:#fff; border-radius:16px; padding:20px; text-align:center; margin-bottom:20px;">
+    <div style="font-size:15px; opacity:0.85;">Checking live status…</div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px;">
+    <a href="/service-stream" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">📺 Live Stream</a>
+    <a href="/donate" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">🤍 Give</a>
+    <a href="/our-message" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">📖 Our Message</a>
+    <a href="/resources" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">📚 Resources</a>
+    <a href="/leadership" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">🧑‍🤝‍🧑 Leadership</a>
+    <a href="/contact-us" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">✉️ Contact</a>
+  </div>
+
+  <div style="margin-bottom:24px;">
+    <h2 style="font-size:16px; margin:0 0 10px;">Announcements</h2>
+    <div id="bhcoc-dash-announcements" style="font-size:14px; color:#666;">Loading…</div>
+  </div>
+
+  <div style="text-align:center;">
+    <a href="/?app_full=1" style="display:inline-block; padding:12px 24px; border-radius:9999px; border:1px solid #7A3E1D; color:#7A3E1D; text-decoration:none; font-weight:600; font-size:14px;">Browse full site →</a>
+  </div>
+
+</div>
+<script>
+(function () {
+  var LIVE_WORKER = 'https://bhcoclivecheck-98db.braxvisuals.workers.dev/';
+  var ANNOUNCEMENTS_WORKER = 'https://fragrant-dream-ef85.braxvisuals.workers.dev/list';
+
+  var liveBox = document.getElementById('bhcoc-dash-live');
+  fetch(LIVE_WORKER)
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data && data.isLive) {
+        liveBox.innerHTML = '<div style="font-size:15px; font-weight:700;">🔴 LIVE NOW</div><a href="/service-stream" style="display:inline-block; margin-top:10px; padding:8px 20px; border-radius:9999px; background:#fff; color:#7A3E1D; text-decoration:none; font-weight:700; font-size:13px;">Watch Now</a>';
+      } else {
+        liveBox.innerHTML = '<div style="font-size:15px;">Not live right now</div><a href="/service-stream" style="display:inline-block; margin-top:10px; padding:8px 20px; border-radius:9999px; background:rgba(255,255,255,0.15); color:#fff; text-decoration:none; font-weight:600; font-size:13px;">Visit Live Stream page</a>';
+      }
+    })
+    .catch(function () {
+      liveBox.innerHTML = '<div style="font-size:15px;">Live status unavailable</div><a href="/service-stream" style="display:inline-block; margin-top:10px; padding:8px 20px; border-radius:9999px; background:rgba(255,255,255,0.15); color:#fff; text-decoration:none; font-weight:600; font-size:13px;">Visit Live Stream page</a>';
+    });
+
+  var announceBox = document.getElementById('bhcoc-dash-announcements');
+  fetch(ANNOUNCEMENTS_WORKER)
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      var announcements = (data && data.announcements) || [];
+      if (!announcements.length) {
+        announceBox.textContent = 'No announcements right now — check back soon!';
+        return;
+      }
+      announceBox.innerHTML = '';
+      announcements.slice(0, 3).forEach(function (a) {
+        var item = document.createElement('div');
+        item.style.cssText = 'padding:10px 0; border-bottom:1px solid #eee; line-height:1.4;';
+        item.textContent = a.cleaned_text;
+        announceBox.appendChild(item);
+      });
+    })
+    .catch(function () {
+      announceBox.textContent = 'Announcements unavailable right now.';
+    });
+})();
+</script>
