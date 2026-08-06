@@ -14,7 +14,11 @@
   - Sermon notes: create/edit/delete notes stored in the browser's
     localStorage. Private to the device - there's no account system in
     this project, so notes don't sync between phone/tablet, but that
-    also means zero setup and it works offline.
+    also means zero setup and it works offline. Each note has an export
+    button (uses the Web Share API where available - iOS's Share sheet -
+    falling back to a plain file download) so someone can save a real
+    copy off the device instead of trusting it'll always be in the
+    browser's local storage.
 
   Translation picker (WEB / KJV / ASV): all three are public domain, so
   they're free through bible-api.com with no signup or key. NIV is
@@ -288,6 +292,22 @@
     transition: opacity 0.2s ease;
   }
   #bhcoc-notes .bhcoc-n-note-saved.is-visible { opacity: 1; }
+  #bhcoc-notes .bhcoc-n-note-export-btn {
+    margin-left: auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--copper-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #bhcoc-notes .bhcoc-n-note-export-btn svg { width: 15px; height: 15px; }
+  #bhcoc-notes .bhcoc-n-note-export-btn:active { transform: scale(0.94); }
 </style>
 
   <header class="bhcoc-n-header">
@@ -526,14 +546,56 @@
         }, 1600);
       });
 
+      var exportBtn = document.createElement('button');
+      exportBtn.className = 'bhcoc-n-note-export-btn';
+      exportBtn.type = 'button';
+      exportBtn.setAttribute('aria-label', 'Save note to device');
+      exportBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+      exportBtn.addEventListener('click', function () {
+        exportNote({ title: titleInput.value, date: note.date, body: body.value });
+      });
+
       saveRow.appendChild(saveBtn);
       saveRow.appendChild(savedStatus);
+      saveRow.appendChild(exportBtn);
 
       card.appendChild(row);
       card.appendChild(body);
       card.appendChild(saveRow);
       notesList.appendChild(card);
     });
+  }
+
+  function exportNote(note) {
+    var content = note.title + '\n' + note.date + '\n\n' + note.body;
+    var filename = (note.title || 'sermon-note').replace(/[^\w\-]+/g, '_') + '.txt';
+
+    if (navigator.share) {
+      var shared = false;
+      if (navigator.canShare && window.File) {
+        try {
+          var file = new File([content], filename, { type: 'text/plain' });
+          if (navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: note.title }).catch(function () {});
+            shared = true;
+          }
+        } catch (e) {}
+      }
+      if (!shared) {
+        navigator.share({ title: note.title, text: content }).catch(function () {});
+      }
+      return;
+    }
+
+    var blob = new Blob([content], { type: 'text/plain' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
   function updateNote(id, fields) {
