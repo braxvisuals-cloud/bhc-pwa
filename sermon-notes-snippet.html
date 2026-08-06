@@ -15,6 +15,13 @@
     localStorage. Private to the device - there's no account system in
     this project, so notes don't sync between phone/tablet, but that
     also means zero setup and it works offline.
+
+  Translation picker (WEB / KJV / ASV): all three are public domain, so
+  they're free through bible-api.com with no signup or key. NIV is
+  copyrighted (Biblica) and isn't available through any free API - real
+  NIV text would need a paid license, out of scope here. The chosen
+  translation is remembered in localStorage and applies to both Verse of
+  the Day and Look Up.
 -->
 <div id="bhcoc-notes">
 <style>
@@ -55,6 +62,40 @@
     margin: 5px 0 0;
     font-style: italic;
   }
+
+  #bhcoc-notes .bhcoc-n-translation-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  #bhcoc-notes .bhcoc-n-translation-label {
+    font-size: 12px;
+    color: var(--ink-muted);
+    font-weight: 600;
+  }
+  #bhcoc-notes .bhcoc-n-translation-pills {
+    display: flex;
+    gap: 6px;
+  }
+  #bhcoc-notes .bhcoc-n-pill {
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1.5px solid var(--line);
+    background: var(--card);
+    color: var(--ink-muted);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+  }
+  #bhcoc-notes .bhcoc-n-pill.is-active {
+    border-color: var(--copper);
+    background: var(--copper);
+    color: #fff;
+  }
+  #bhcoc-notes .bhcoc-n-pill:active { transform: scale(0.96); }
 
   #bhcoc-notes .bhcoc-n-card {
     background: var(--card);
@@ -229,6 +270,15 @@
     <p class="bhcoc-n-tagline">Take it in, write it down, look it up</p>
   </header>
 
+  <div class="bhcoc-n-translation-row">
+    <span class="bhcoc-n-translation-label">Translation:</span>
+    <div class="bhcoc-n-translation-pills" id="bhcoc-translation-pills">
+      <button type="button" class="bhcoc-n-pill" data-translation="web">WEB</button>
+      <button type="button" class="bhcoc-n-pill" data-translation="kjv">KJV</button>
+      <button type="button" class="bhcoc-n-pill" data-translation="asv">ASV</button>
+    </div>
+  </div>
+
   <section class="bhcoc-n-card">
     <h2 class="bhcoc-n-card-title">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
@@ -271,6 +321,8 @@
     'Matthew 11:28', '1 Corinthians 13:4-7', 'Psalm 46:1', 'Romans 12:2'
   ];
   var NOTES_KEY = 'bhcoc-sermon-notes-v1';
+  var TRANSLATION_KEY = 'bhcoc-bible-translation';
+  var VALID_TRANSLATIONS = ['web', 'kjv', 'asv'];
 
   function dayOfYear(date) {
     var start = new Date(date.getFullYear(), 0, 0);
@@ -278,8 +330,8 @@
     return Math.floor(diff / 86400000);
   }
 
-  function fetchVerse(reference, onSuccess, onError) {
-    fetch(BIBLE_API + encodeURIComponent(reference))
+  function fetchVerse(reference, translation, onSuccess, onError) {
+    fetch(BIBLE_API + encodeURIComponent(reference) + '?translation=' + translation)
       .then(function (res) { return res.json(); })
       .then(function (data) {
         if (!data || data.error || !data.text) { onError(); return; }
@@ -288,31 +340,53 @@
       .catch(onError);
   }
 
+  var currentTranslation = localStorage.getItem(TRANSLATION_KEY);
+  if (VALID_TRANSLATIONS.indexOf(currentTranslation) === -1) currentTranslation = 'web';
+
+  var pillsRow = document.getElementById('bhcoc-translation-pills');
+  function updatePillStates() {
+    var pills = pillsRow.querySelectorAll('.bhcoc-n-pill');
+    for (var i = 0; i < pills.length; i++) {
+      pills[i].classList.toggle('is-active', pills[i].getAttribute('data-translation') === currentTranslation);
+    }
+  }
+  updatePillStates();
+
   var votdText = document.getElementById('bhcoc-votd-text');
   var votdRef = document.getElementById('bhcoc-votd-ref');
   var votdReference = VOTD_REFS[dayOfYear(new Date()) % VOTD_REFS.length];
-  fetchVerse(
-    votdReference,
-    function (data) {
-      votdText.textContent = '"' + data.text.trim().replace(/\s+/g, ' ') + '"';
-      votdRef.textContent = data.reference + (data.translation_name ? ' · ' + data.translation_name : '');
-    },
-    function () {
-      votdText.textContent = 'Verse unavailable right now.';
-      votdRef.textContent = '';
-    }
-  );
+
+  function loadVerseOfDay() {
+    votdText.textContent = 'Loading…';
+    votdRef.textContent = '';
+    fetchVerse(
+      votdReference,
+      currentTranslation,
+      function (data) {
+        votdText.textContent = '"' + data.text.trim().replace(/\s+/g, ' ') + '"';
+        votdRef.textContent = data.reference + (data.translation_name ? ' · ' + data.translation_name : '');
+      },
+      function () {
+        votdText.textContent = 'Verse unavailable right now.';
+        votdRef.textContent = '';
+      }
+    );
+  }
+  loadVerseOfDay();
 
   var lookupInput = document.getElementById('bhcoc-lookup-input');
   var lookupBtn = document.getElementById('bhcoc-lookup-btn');
   var lookupResult = document.getElementById('bhcoc-lookup-result');
+  var lastLookupQuery = '';
 
   function runLookup() {
     var query = lookupInput.value.trim();
     if (!query) return;
+    lastLookupQuery = query;
     lookupResult.innerHTML = 'Searching…';
     fetchVerse(
       query,
+      currentTranslation,
       function (data) {
         lookupResult.innerHTML =
           '<span class="bhcoc-n-verse-text">"' + data.text.trim().replace(/\s+/g, ' ') + '"</span>' +
@@ -326,6 +400,21 @@
   lookupBtn.addEventListener('click', runLookup);
   lookupInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') runLookup();
+  });
+
+  pillsRow.addEventListener('click', function (e) {
+    var pill = e.target.closest('.bhcoc-n-pill');
+    if (!pill) return;
+    var translation = pill.getAttribute('data-translation');
+    if (translation === currentTranslation) return;
+    currentTranslation = translation;
+    localStorage.setItem(TRANSLATION_KEY, currentTranslation);
+    updatePillStates();
+    loadVerseOfDay();
+    if (lastLookupQuery) {
+      lookupInput.value = lastLookupQuery;
+      runLookup();
+    }
   });
 
   function loadNotes() {

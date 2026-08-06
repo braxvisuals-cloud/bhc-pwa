@@ -99,6 +99,8 @@ The goal: opening the installed app should show a dashboard screen instead of th
 
 **Sermon Notes & Bible (`/notes`):** a second unlisted page, linked from the dashboard's "Sermon Notes" tile. Verse of the Day and verse lookup both call [bible-api.com](https://bible-api.com) directly (free, no key, CORS-enabled) — no Worker needed since this is a plain `fetch()` call, not a Durable video/embed block that mangles URLs. Sermon notes (create/edit/delete) are stored in the browser's `localStorage` under the key `bhcoc-sermon-notes-v1` — there's no account system in this project, so notes are private to that one device and don't sync between a phone and an iPad, but that also means zero setup, no server cost, and it still works with no signal.
 
+A translation picker (WEB / KJV / ASV, remembered in `localStorage` under `bhcoc-bible-translation`) applies to both Verse of the Day and Look Up. **NIV is deliberately not an option** — it's copyrighted by Biblica and isn't available through any free, no-signup Bible API; getting real NIV text would require a paid license and API key, which is out of scope for this project. WEB/KJV/ASV are all public domain.
+
 ## How the announcements feature works
 
 The Worker (`announcements/worker.js`) has three endpoints:
