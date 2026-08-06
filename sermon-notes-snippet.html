@@ -15,8 +15,11 @@
     localStorage. Private to the device - there's no account system in
     this project, so notes don't sync between phone/tablet, but that
     also means zero setup and it works offline. Each note has an export
-    button (uses the Web Share API where available - iOS's Share sheet -
-    falling back to a plain file download) so someone can save a real
+    button - on iOS/Android it opens the native Share sheet (Web Share
+    API); on desktop it just triggers a plain file download instead,
+    since desktop browsers' share flyouts (tested on Windows/Edge) are
+    unreliable and can fail with a generic "we couldn't show you all the
+    ways you could share" error. Either way, it gives someone a real
     copy off the device instead of trusting it'll always be in the
     browser's local storage.
 
@@ -571,8 +574,10 @@
     var filename = (note.title || 'sermon-note').replace(/[^\w\-]+/g, '_') + '.txt';
 
     var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    var isAndroid = /Android/i.test(navigator.userAgent);
+    var isMobile = isIOS || isAndroid;
 
-    if (isIOS && navigator.share) {
+    if (isMobile && navigator.share) {
       var shared = false;
       if (navigator.canShare && window.File) {
         try {
