@@ -7,8 +7,16 @@
   Shows a small dismissible banner, site-wide, only to iPhone/iPad Safari
   visitors who haven't already installed the app, pointing them to
   Share -> Add to Home Screen (iOS has no automatic install prompt like
-  Android Chrome does, so this is the only way people discover it).
-  Dismissal is remembered via localStorage so it won't nag repeat visitors.
+  Android Chrome's beforeinstallprompt - Safari has never implemented
+  that API at all - so this custom banner is the only way people
+  discover it on iOS).
+
+  Dismissal is remembered via sessionStorage, not localStorage - closing
+  it hides it for the rest of that browsing session (so it's not naggy
+  while someone's actively on the site) but it comes back fresh on their
+  next visit, and keeps coming back on every visit until they actually
+  install. It already never shows at all once the app is genuinely
+  installed and opened from the home screen (the isStandalone check).
 -->
 <script>
 (function () {
@@ -16,7 +24,7 @@
   var isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
   var isStandalone = window.navigator.standalone === true;
   if (!isIOS || !isSafari || isStandalone) return;
-  if (localStorage.getItem('bhcoc-install-banner-dismissed')) return;
+  if (sessionStorage.getItem('bhcoc-install-banner-dismissed')) return;
 
   var banner = document.createElement('div');
   banner.style.cssText = 'position:fixed; left:16px; right:16px; bottom:16px; z-index:99999; background:#7A3E1D; color:#fff; padding:12px 16px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25); font-family:sans-serif; font-size:14px; display:flex; align-items:center; gap:12px;';
@@ -32,7 +40,7 @@
   closeBtn.style.cssText = 'background:none; border:none; color:#fff; font-size:18px; cursor:pointer; padding:4px 8px; line-height:1; flex-shrink:0;';
   closeBtn.addEventListener('click', function () {
     banner.remove();
-    localStorage.setItem('bhcoc-install-banner-dismissed', '1');
+    sessionStorage.setItem('bhcoc-install-banner-dismissed', '1');
     if (window.bhcocTrack) window.bhcocTrack('ios_banner_dismissed');
   });
   banner.appendChild(closeBtn);
