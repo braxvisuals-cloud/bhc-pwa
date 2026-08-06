@@ -26,6 +26,7 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
 | `ios-install-banner-snippet.html` | **In use.** One of the scripts in Durable's Footer Code box (see below). |
 | `dashboard-snippet.html` | **In use.** The hidden dashboard's content — paste into a new, unlisted `/dashboard` page in Durable. |
 | `pwa-dashboard-router-snippet.html` | **In use.** One of the scripts in Durable's Footer Code box — routes installed-app launches to `/dashboard` (see below). |
+| `footer-code-combined.html` | **Use this one for pasting.** All four Footer Code scripts already glued together in order — copy this whole file into Footer Code instead of assembling the four by hand. |
 | `live-stream/worker.js` | **In use, deployed to Cloudflare.** The live-check + recent-videos backend. |
 | `live-stream/durable-footer-snippet.html` | **In use.** The other script in Durable's Footer Code box. |
 | `announcements/schema.sql` | Run once in D1's Console to create the `announcements` table. |
@@ -52,7 +53,9 @@ Durable allows custom code injection (a Head Code box and a Footer Code box, und
   3. `announcements/durable-footer-feed-snippet.html` (announcements ticker)
   4. `pwa-dashboard-router-snippet.html` (routes installed-app launches to the hidden dashboard)
 
-  **Gotcha:** this box has gone from "all present" to "only one present" more than once — pasting a *replacement* for one script into this box, instead of appending it alongside the others, wipes the others out silently (no error, they just stop running). Always paste the **full combined set of all four** as the entire Footer Code contents, never just one in isolation, unless you've first confirmed the others are still there.
+  **Easiest way to paste this:** just copy the entire contents of `footer-code-combined.html` into the Footer Code box — it's all four scripts already stitched together in the right order, nothing to assemble by hand.
+
+  **Gotcha:** this box has gone from "all present" to "only one present" more than once — pasting a *replacement* for one script into this box, instead of appending it alongside the others, wipes the others out silently (no error, they just stop running). If you ever edit just one of the four source files, regenerate `footer-code-combined.html` (or manually re-merge) before pasting — never paste a single script in isolation into a box that already has the others in it.
 - **Homepage**: has an "Embed object with code" block containing just `<div id="bhcoc-announcements-feed"></div>` (no script — the script lives in Footer Code and finds this div).
 - **`/announcements`**: a page with an "Embed object with code" block containing the submission form (`announcements/durable-submission-form-snippet.html`), linked from a footer "Admin" link. Not private/unlinked as originally suggested — anyone can find the page, but the PIN still gates actual submission.
 - **`/dashboard`**: a new page, **removed from the main nav menu** (unlisted — reachable by direct URL but not linked from anywhere a normal visitor would browse), with an "Embed object with code" block containing `dashboard-snippet.html`. This is the hidden app screen — see below.
