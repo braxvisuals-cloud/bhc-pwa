@@ -570,7 +570,9 @@
     var content = note.title + '\n' + note.date + '\n\n' + note.body;
     var filename = (note.title || 'sermon-note').replace(/[^\w\-]+/g, '_') + '.txt';
 
-    if (navigator.share) {
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    if (isIOS && navigator.share) {
       var shared = false;
       if (navigator.canShare && window.File) {
         try {
