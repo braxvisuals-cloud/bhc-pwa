@@ -1,45 +1,307 @@
 <!--
-  Bush Hills Church of Christ - Hidden PWA dashboard
-  Placement: an "Embed object with code" block on a NEW Durable page at
-  path /dashboard. Create the page in Durable's editor, remove it from the
-  main nav menu (unlisted, same treatment as /announcements), and paste
-  this as the page's only content block.
+  Bush Hills Church of Christ - Hidden PWA dashboard (v2, polished)
+  Placement: an "Embed object with code" block on the unlisted /dashboard
+  page in Durable. Replaces the earlier plainer version - same behavior
+  (live status, quick links, announcements, browse-full-site), redesigned
+  to look like a real app screen instead of a bare content block.
 
-  This page exists only to be the installed app's home screen.
-  pwa-dashboard-router-snippet.html (pasted into Footer Code) is what
-  routes installed-app launches here automatically and leaves normal
-  browser visitors alone - this page itself has no routing logic, it's
-  just the screen that gets shown.
+  Self-contained: styles and script are scoped under #bhcoc-dashboard so
+  they don't leak into or clash with the rest of the Durable site.
 -->
-<div id="bhcoc-dashboard" style="max-width:640px; margin:0 auto; padding:24px 16px 96px; font-family:sans-serif; color:#222;">
+<div id="bhcoc-dashboard">
+<style>
+  #bhcoc-dashboard {
+    --copper: #7A3E1D;
+    --copper-dark: #56290F;
+    --copper-soft: rgba(122, 62, 29, 0.08);
+    --gold: #C9A15A;
+    --paper: #FAF7F2;
+    --card: #FFFFFF;
+    --ink: #2B2420;
+    --ink-muted: #8A7F73;
+    --line: #ECE4D8;
+    --live: #D14B3B;
 
-  <div style="text-align:center; margin-bottom:24px;">
-    <img src="https://marvelous-halva-940fc1.netlify.app/icons/icon-192.png" alt="Bush Hills Church of Christ" style="width:72px; height:72px; border-radius:16px; margin-bottom:12px;">
-    <h1 style="font-size:22px; margin:0;">Bush Hills Church of Christ</h1>
-    <p style="color:#666; margin:4px 0 0;">The Friendliest Church on this side of Heaven</p>
-  </div>
+    box-sizing: border-box;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: max(28px, env(safe-area-inset-top)) 18px calc(56px + env(safe-area-inset-bottom));
+  }
+  #bhcoc-dashboard *, #bhcoc-dashboard *::before, #bhcoc-dashboard *::after {
+    box-sizing: border-box;
+  }
+  #bhcoc-dashboard .bhcoc-fade {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: bhcoc-fade-in 0.5s ease forwards;
+  }
+  @keyframes bhcoc-fade-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
 
-  <div id="bhcoc-dash-live" style="background:#7A3E1D; color:#fff; border-radius:16px; padding:20px; text-align:center; margin-bottom:20px;">
-    <div style="font-size:15px; opacity:0.85;">Checking live status…</div>
-  </div>
+  #bhcoc-dashboard .bhcoc-header {
+    text-align: center;
+    margin-bottom: 26px;
+    animation-delay: 0s;
+  }
+  #bhcoc-dashboard .bhcoc-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    box-shadow: 0 8px 20px -8px rgba(43, 36, 32, 0.35);
+    margin-bottom: 14px;
+  }
+  #bhcoc-dashboard .bhcoc-title {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 23px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    margin: 0;
+    color: var(--ink);
+  }
+  #bhcoc-dashboard .bhcoc-tagline {
+    font-size: 13px;
+    color: var(--ink-muted);
+    margin: 5px 0 0;
+    font-style: italic;
+  }
 
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px;">
-    <a href="/service-stream" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">📺 Live Stream</a>
-    <a href="/donate" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">🤍 Give</a>
-    <a href="/our-message" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">📖 Our Message</a>
-    <a href="/resources" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">📚 Resources</a>
-    <a href="/leadership" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">🧑‍🤝‍🧑 Leadership</a>
-    <a href="/contact-us" style="display:block; padding:18px 14px; border-radius:12px; background:#f4f1ee; color:#222; text-decoration:none; font-weight:600; text-align:center;">✉️ Contact</a>
-  </div>
+  #bhcoc-dashboard .bhcoc-live {
+    background: linear-gradient(135deg, var(--copper) 0%, var(--copper-dark) 100%);
+    border-radius: 18px;
+    padding: 22px 20px;
+    color: #fff;
+    text-align: center;
+    box-shadow: 0 14px 30px -14px rgba(86, 41, 15, 0.55);
+    margin-bottom: 22px;
+    animation-delay: 0.05s;
+  }
+  #bhcoc-dashboard .bhcoc-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.14);
+    padding: 5px 10px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  #bhcoc-dashboard .bhcoc-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ink-muted);
+    display: inline-block;
+  }
+  #bhcoc-dashboard .bhcoc-live-dot.is-live {
+    background: #ff6b57;
+    box-shadow: 0 0 0 0 rgba(255, 107, 87, 0.6);
+    animation: bhcoc-pulse 1.6s ease-out infinite;
+  }
+  @keyframes bhcoc-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255, 107, 87, 0.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(255, 107, 87, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 107, 87, 0); }
+  }
+  #bhcoc-dashboard .bhcoc-live-headline {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 14px;
+  }
+  #bhcoc-dashboard .bhcoc-live-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    color: var(--copper-dark);
+    font-weight: 700;
+    font-size: 13.5px;
+    padding: 9px 18px;
+    border-radius: 999px;
+    text-decoration: none;
+    transition: transform 0.15s ease;
+  }
+  #bhcoc-dashboard .bhcoc-live-btn.bhcoc-outline {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  #bhcoc-dashboard .bhcoc-live-btn:active {
+    transform: scale(0.96);
+  }
 
-  <div style="margin-bottom:24px;">
-    <h2 style="font-size:16px; margin:0 0 10px;">Announcements</h2>
-    <div id="bhcoc-dash-announcements" style="font-size:14px; color:#666;">Loading…</div>
-  </div>
+  #bhcoc-dashboard .bhcoc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 11px;
+    margin-bottom: 24px;
+    animation-delay: 0.1s;
+  }
+  #bhcoc-dashboard .bhcoc-tile {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px 12px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(43, 36, 32, 0.04);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  #bhcoc-dashboard .bhcoc-tile:active {
+    transform: scale(0.96);
+    box-shadow: 0 1px 2px rgba(43, 36, 32, 0.04);
+  }
+  #bhcoc-dashboard .bhcoc-tile-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: var(--copper-soft);
+    color: var(--copper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+  }
+  #bhcoc-dashboard .bhcoc-tile-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+  #bhcoc-dashboard .bhcoc-tile-label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+  }
 
-  <div style="text-align:center;">
-    <a href="/?app_full=1" style="display:inline-block; padding:12px 24px; border-radius:9999px; border:1px solid #7A3E1D; color:#7A3E1D; text-decoration:none; font-weight:600; font-size:14px;">Browse full site →</a>
-  </div>
+  #bhcoc-dashboard .bhcoc-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px 18px 6px;
+    margin-bottom: 22px;
+    box-shadow: 0 1px 2px rgba(43, 36, 32, 0.04);
+    animation-delay: 0.15s;
+  }
+  #bhcoc-dashboard .bhcoc-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    margin: 0 0 8px;
+    color: var(--copper-dark);
+  }
+  #bhcoc-dashboard .bhcoc-card-title svg {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+  }
+  #bhcoc-dashboard .bhcoc-announce-item {
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+  #bhcoc-dashboard .bhcoc-announce-item:first-child {
+    border-top: none;
+  }
+  #bhcoc-dashboard .bhcoc-empty,
+  #bhcoc-dashboard .bhcoc-skeleton-text {
+    font-size: 13.5px;
+    color: var(--ink-muted);
+    font-style: italic;
+    padding: 12px 0;
+  }
+
+  #bhcoc-dashboard .bhcoc-footer {
+    text-align: center;
+    animation-delay: 0.2s;
+  }
+  #bhcoc-dashboard .bhcoc-browse-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    border: 1.5px solid var(--copper);
+    color: var(--copper);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: 0.1px;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  #bhcoc-dashboard .bhcoc-browse-btn:active {
+    transform: scale(0.96);
+    background: var(--copper-soft);
+  }
+  #bhcoc-dashboard .bhcoc-browse-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+</style>
+
+  <header class="bhcoc-header bhcoc-fade">
+    <img class="bhcoc-logo" src="https://marvelous-halva-940fc1.netlify.app/icons/icon-192.png" alt="Bush Hills Church of Christ">
+    <h1 class="bhcoc-title">Bush Hills Church of Christ</h1>
+    <p class="bhcoc-tagline">The Friendliest Church on this side of Heaven</p>
+  </header>
+
+  <section id="bhcoc-dash-live" class="bhcoc-live bhcoc-fade">
+    <div class="bhcoc-live-badge"><span class="bhcoc-live-dot"></span><span class="bhcoc-live-status-text">Checking</span></div>
+    <div class="bhcoc-live-headline">Checking live status…</div>
+  </section>
+
+  <nav class="bhcoc-grid bhcoc-fade">
+    <a href="/service-stream" class="bhcoc-tile">
+      <span class="bhcoc-tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="10,8.3 16,12 10,15.7" fill="currentColor" stroke="none"/></svg></span>
+      <span class="bhcoc-tile-label">Live Stream</span>
+    </a>
+    <a href="/donate" class="bhcoc-tile">
+      <span class="bhcoc-tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.3-9.5-8.4C1 8.4 2.6 5 6.1 5c2 0 3.5 1.2 4 2.2.5-1 2-2.2 4-2.2 3.5 0 5.1 3.4 3.6 6.6C19 15.7 12 20 12 20z"/></svg></span>
+      <span class="bhcoc-tile-label">Give</span>
+    </a>
+    <a href="/our-message" class="bhcoc-tile">
+      <span class="bhcoc-tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.3S4 4 7.5 4 12 5.3 12 5.3v14.4S10 18.4 7.5 18.4 2 19.7 2 19.7V5.3z"/><path d="M22 5.3S20 4 16.5 4 12 5.3 12 5.3v14.4s2-1.3 4.5-1.3 5.5 1.3 5.5 1.3V5.3z"/></svg></span>
+      <span class="bhcoc-tile-label">Our Message</span>
+    </a>
+    <a href="/resources" class="bhcoc-tile">
+      <span class="bhcoc-tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a1 1 0 0 1 1-1h3v16"/><path d="M9 4h6v16"/><path d="M15 4.3l4 .9v14.8l-4-.9"/></svg></span>
+      <span class="bhcoc-tile-label">Resources</span>
+    </a>
+    <a href="/leadership" class="bhcoc-tile">
+      <span class="bhcoc-tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.8 19c0-3 2.8-5.2 6.2-5.2S15.2 16 15.2 19"/><circle cx="17" cy="8.6" r="2.4"/><path d="M15.6 13.9c2.5.4 4.2 2.3 4.2 5.1"/></svg></span>
+      <span class="bhcoc-tile-label">Leadership</span>
+    </a>
+    <a href="/contact-us" class="bhcoc-tile">
+      <span class="bhcoc-tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M3.2 6.5l8.8 6.4 8.8-6.4"/></svg></span>
+      <span class="bhcoc-tile-label">Contact</span>
+    </a>
+  </nav>
+
+  <section class="bhcoc-card bhcoc-fade">
+    <h2 class="bhcoc-card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/></svg>
+      Announcements
+    </h2>
+    <div id="bhcoc-dash-announcements">
+      <div class="bhcoc-skeleton-text">Loading…</div>
+    </div>
+  </section>
+
+  <footer class="bhcoc-footer bhcoc-fade">
+    <a href="/?app_full=1" class="bhcoc-browse-btn">
+      Browse full site
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+    </a>
+  </footer>
 
 </div>
 <script>
@@ -47,19 +309,28 @@
   var LIVE_WORKER = 'https://bhcoclivecheck-98db.braxvisuals.workers.dev/';
   var ANNOUNCEMENTS_WORKER = 'https://fragrant-dream-ef85.braxvisuals.workers.dev/list';
 
-  var liveBox = document.getElementById('bhcoc-dash-live');
+  var liveSection = document.getElementById('bhcoc-dash-live');
+  var liveDot = liveSection.querySelector('.bhcoc-live-dot');
+  var liveStatusText = liveSection.querySelector('.bhcoc-live-status-text');
+  var liveHeadline = liveSection.querySelector('.bhcoc-live-headline');
+
+  function renderLive(isLive) {
+    liveDot.classList.toggle('is-live', !!isLive);
+    if (isLive) {
+      liveStatusText.textContent = 'Live';
+      liveHeadline.textContent = 'Service is live right now';
+      liveSection.insertAdjacentHTML('beforeend', '<a href="/service-stream" class="bhcoc-live-btn">Watch Now</a>');
+    } else {
+      liveStatusText.textContent = 'Offline';
+      liveHeadline.textContent = 'Not live right now';
+      liveSection.insertAdjacentHTML('beforeend', '<a href="/service-stream" class="bhcoc-live-btn bhcoc-outline">Visit Live Stream page</a>');
+    }
+  }
+
   fetch(LIVE_WORKER)
     .then(function (res) { return res.json(); })
-    .then(function (data) {
-      if (data && data.isLive) {
-        liveBox.innerHTML = '<div style="font-size:15px; font-weight:700;">🔴 LIVE NOW</div><a href="/service-stream" style="display:inline-block; margin-top:10px; padding:8px 20px; border-radius:9999px; background:#fff; color:#7A3E1D; text-decoration:none; font-weight:700; font-size:13px;">Watch Now</a>';
-      } else {
-        liveBox.innerHTML = '<div style="font-size:15px;">Not live right now</div><a href="/service-stream" style="display:inline-block; margin-top:10px; padding:8px 20px; border-radius:9999px; background:rgba(255,255,255,0.15); color:#fff; text-decoration:none; font-weight:600; font-size:13px;">Visit Live Stream page</a>';
-      }
-    })
-    .catch(function () {
-      liveBox.innerHTML = '<div style="font-size:15px;">Live status unavailable</div><a href="/service-stream" style="display:inline-block; margin-top:10px; padding:8px 20px; border-radius:9999px; background:rgba(255,255,255,0.15); color:#fff; text-decoration:none; font-weight:600; font-size:13px;">Visit Live Stream page</a>';
-    });
+    .then(function (data) { renderLive(data && data.isLive); })
+    .catch(function () { renderLive(false); });
 
   var announceBox = document.getElementById('bhcoc-dash-announcements');
   fetch(ANNOUNCEMENTS_WORKER)
@@ -67,19 +338,19 @@
     .then(function (data) {
       var announcements = (data && data.announcements) || [];
       if (!announcements.length) {
-        announceBox.textContent = 'No announcements right now — check back soon!';
+        announceBox.innerHTML = '<div class="bhcoc-empty">No announcements right now — check back soon!</div>';
         return;
       }
       announceBox.innerHTML = '';
       announcements.slice(0, 3).forEach(function (a) {
         var item = document.createElement('div');
-        item.style.cssText = 'padding:10px 0; border-bottom:1px solid #eee; line-height:1.4;';
+        item.className = 'bhcoc-announce-item';
         item.textContent = a.cleaned_text;
         announceBox.appendChild(item);
       });
     })
     .catch(function () {
-      announceBox.textContent = 'Announcements unavailable right now.';
+      announceBox.innerHTML = '<div class="bhcoc-empty">Announcements unavailable right now.</div>';
     });
 })();
 </script>
