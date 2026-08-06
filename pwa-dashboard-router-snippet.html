@@ -17,10 +17,19 @@
      Tapping "Browse full site" on the dashboard (a link to "/?app_full=1")
      bypasses this for the rest of that app session, so browsing the real
      site from there doesn't keep bouncing back to the dashboard.
-  2. Adds a small floating "back to dashboard" button on every other page,
-     since the dashboard is meant to act as the app's home base while
-     browsing - there's no browser address bar in standalone mode to type
-     a URL into.
+  2. Adds a small floating "back to dashboard" button on every page except
+     /dashboard itself, since the dashboard is meant to act as the app's
+     home base while browsing - there's no browser address bar in standalone
+     mode to type a URL into.
+  3. On /dashboard and /notes specifically, hides Durable's own site
+     header/nav so those two pages read as dedicated app screens instead of
+     regular site pages. There's no way to know Durable's internal class
+     names from outside its editor, so instead of guessing a CSS selector
+     that might not exist, this climbs up from our own embedded content
+     (#bhcoc-dashboard or #bhcoc-notes) to whatever element sits right
+     before it in the page and hides that - which, structurally, has to be
+     the header/nav, whatever Durable happens to call it. It's restored
+     automatically the moment you navigate to any other page.
 
   Durable's site is a Next.js single-page app - clicking nav links doesn't
   reload the page, it swaps content in place - so this polls the current
@@ -32,6 +41,7 @@
   if (!isStandalone) return;
 
   var DASHBOARD_PATH = '/dashboard';
+  var NOTES_PATH = '/notes';
   var BYPASS_KEY = 'bhcoc-pwa-full-site';
 
   if (window.location.search.indexOf('app_full=1') !== -1) {
@@ -42,6 +52,10 @@
   ) {
     window.location.replace(DASHBOARD_PATH);
     return;
+  }
+
+  function isAppScreen(path) {
+    return path === DASHBOARD_PATH || path === NOTES_PATH;
   }
 
   function ensureHomeButton() {
@@ -61,11 +75,49 @@
     document.body.appendChild(btn);
   }
 
+  var hiddenChromeEls = [];
+
+  function hideSiteChrome() {
+    if (hiddenChromeEls.length) return;
+    var content = document.getElementById('bhcoc-dashboard') || document.getElementById('bhcoc-notes');
+    if (!content) return;
+
+    var node = content;
+    while (node && node.parentElement && node !== document.body) {
+      if (node.previousElementSibling) {
+        var sib = node.previousElementSibling;
+        while (sib) {
+          sib.style.setProperty('display', 'none', 'important');
+          hiddenChromeEls.push(sib);
+          sib = sib.previousElementSibling;
+        }
+        return;
+      }
+      node = node.parentElement;
+    }
+  }
+
+  function restoreSiteChrome() {
+    if (!hiddenChromeEls.length) return;
+    hiddenChromeEls.forEach(function (el) {
+      el.style.removeProperty('display');
+    });
+    hiddenChromeEls = [];
+  }
+
   var lastPath = null;
   function sync() {
-    if (window.location.pathname === lastPath) return;
-    lastPath = window.location.pathname;
-    ensureHomeButton();
+    var path = window.location.pathname;
+    if (path !== lastPath) {
+      lastPath = path;
+      ensureHomeButton();
+    }
+
+    if (isAppScreen(path)) {
+      hideSiteChrome();
+    } else {
+      restoreSiteChrome();
+    }
   }
   sync();
   setInterval(sync, 500);
