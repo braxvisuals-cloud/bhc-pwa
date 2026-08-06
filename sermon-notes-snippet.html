@@ -263,6 +263,31 @@
     resize: vertical;
   }
   #bhcoc-notes .bhcoc-n-note-body:focus { outline: none; border-color: var(--copper); }
+  #bhcoc-notes .bhcoc-n-note-save-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  #bhcoc-notes .bhcoc-n-note-save-btn {
+    padding: 7px 16px;
+    border-radius: 999px;
+    border: none;
+    background: var(--copper);
+    color: #fff;
+    font-weight: 700;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  #bhcoc-notes .bhcoc-n-note-save-btn:active { transform: scale(0.96); }
+  #bhcoc-notes .bhcoc-n-note-saved {
+    font-size: 12px;
+    font-weight: 600;
+    color: #3a7d44;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  #bhcoc-notes .bhcoc-n-note-saved.is-visible { opacity: 1; }
 </style>
 
   <header class="bhcoc-n-header">
@@ -480,8 +505,33 @@
         updateNote(note.id, { body: body.value });
       });
 
+      var saveRow = document.createElement('div');
+      saveRow.className = 'bhcoc-n-note-save-row';
+
+      var saveBtn = document.createElement('button');
+      saveBtn.className = 'bhcoc-n-note-save-btn';
+      saveBtn.type = 'button';
+      saveBtn.textContent = 'Save';
+
+      var savedStatus = document.createElement('span');
+      savedStatus.className = 'bhcoc-n-note-saved';
+      savedStatus.textContent = 'Saved ✓';
+
+      saveBtn.addEventListener('click', function () {
+        updateNote(note.id, { title: titleInput.value, body: body.value });
+        savedStatus.classList.add('is-visible');
+        clearTimeout(savedStatus._hideTimer);
+        savedStatus._hideTimer = setTimeout(function () {
+          savedStatus.classList.remove('is-visible');
+        }, 1600);
+      });
+
+      saveRow.appendChild(saveBtn);
+      saveRow.appendChild(savedStatus);
+
       card.appendChild(row);
       card.appendChild(body);
+      card.appendChild(saveRow);
       notesList.appendChild(card);
     });
   }
