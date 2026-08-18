@@ -270,7 +270,6 @@
   var hiddenChromeEls = [];
 
   function hideSiteChrome() {
-    if (hiddenChromeEls.length) return;
     var content = document.getElementById('bhcoc-dashboard') || document.getElementById('bhcoc-notes');
     if (!content) return;
 
@@ -280,7 +279,7 @@
         var sib = node.previousElementSibling;
         while (sib) {
           sib.style.setProperty('display', 'none', 'important');
-          hiddenChromeEls.push(sib);
+          if (hiddenChromeEls.indexOf(sib) === -1) hiddenChromeEls.push(sib);
           sib = sib.previousElementSibling;
         }
         return;

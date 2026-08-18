@@ -34,12 +34,14 @@
   Durable's site is a Next.js single-page app - clicking nav links doesn't
   reload the page, it swaps content in place - so this polls the current
   path like the live-stream script does, instead of only checking once.
-  ensureHomeButton() specifically runs on every single poll tick, not just
-  when the path changes - Durable's own re-renders can wipe our appended
-  button out of the DOM without the URL changing again, and since the
-  check is idempotent (no-ops if the button's already there), polling it
-  unconditionally is what makes it self-healing instead of vanishing for
-  good the first time that happens.
+  ensureHomeButton() and hideSiteChrome() both run on every single poll
+  tick unconditionally, not gated behind "did this already succeed once" -
+  Durable's own re-renders can wipe our appended button, or replace the
+  header/nav with a fresh un-hidden copy, without the URL ever changing
+  again. Both functions are idempotent (re-hiding an already-hidden
+  element, or no-opping when the button's already there, is harmless), so
+  polling them unconditionally is what makes them self-healing instead of
+  silently breaking the first time Durable re-renders underneath them.
 -->
 <script>
 (function () {
@@ -84,7 +86,6 @@
   var hiddenChromeEls = [];
 
   function hideSiteChrome() {
-    if (hiddenChromeEls.length) return;
     var content = document.getElementById('bhcoc-dashboard') || document.getElementById('bhcoc-notes');
     if (!content) return;
 
@@ -94,7 +95,7 @@
         var sib = node.previousElementSibling;
         while (sib) {
           sib.style.setProperty('display', 'none', 'important');
-          hiddenChromeEls.push(sib);
+          if (hiddenChromeEls.indexOf(sib) === -1) hiddenChromeEls.push(sib);
           sib = sib.previousElementSibling;
         }
         return;
