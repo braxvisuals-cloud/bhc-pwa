@@ -300,10 +300,8 @@
   var lastPath = null;
   function sync() {
     var path = window.location.pathname;
-    if (path !== lastPath) {
-      lastPath = path;
-      ensureHomeButton();
-    }
+    lastPath = path;
+    ensureHomeButton();
 
     if (isAppScreen(path)) {
       hideSiteChrome();
