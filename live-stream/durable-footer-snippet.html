@@ -6,12 +6,20 @@
   1. Asks the Cloudflare Worker whether the channel is live right now. If
      yes, swaps the existing video iframe to the live video (normal
      youtube.com/embed/VIDEO_ID format). If not, leaves the Video block's
-     current static video alone.
+     current static video alone. Keeps re-checking every 20 seconds while
+     someone stays on the page, not just once on arrival - otherwise
+     someone already sitting on the page when the stream actually starts
+     would need to manually refresh to see it swap over. (The Worker's
+     own 5-minute response cache is a separate, lower-level delay this
+     doesn't change - see the README's troubleshooting section.)
   2. Renders a "Recent Videos" row of the channel's 3 latest uploads right
      under the video. Clicking one plays it in the main player above
      (stays on the site, no redirect to YouTube), and reveals a "Back to
      Live Stream" / "Back to Main Video" button that restores whatever was
-     playing originally - no page refresh needed.
+     playing originally - no page refresh needed. While someone's watching
+     a recent video this way, the periodic re-check leaves the player
+     alone (doesn't yank them back to the live stream mid-video) - it just
+     keeps the "Back to..." button's label current for when they do return.
 
   Durable's site is a Next.js single-page app - clicking nav links doesn't
   reload the page, it swaps content in place. So this script polls the
@@ -22,14 +30,18 @@
 <script>
 (function () {
   var WORKER_URL = 'https://bhcoclivecheck-98db.braxvisuals.workers.dev/';
+  var LIVE_CHECK_INTERVAL_MS = 20000;
   var originalSrc = null;
   var wasLive = false;
+  var viewingRecentVideo = false;
   var backButton = null;
   var cachedData = null;
   var lastPath = null;
+  var lastLiveCheckAt = 0;
 
   function swapLiveVideo(data) {
-    if (!data || !data.isLive || !data.videoId) return;
+    wasLive = !!(data && data.isLive);
+    if (!wasLive || !data.videoId) return;
     var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
     if (!iframe) return;
     var liveEmbedSrc = 'https://www.youtube.com/embed/' + data.videoId + '?autoplay=1';
@@ -37,10 +49,10 @@
       iframe.src = liveEmbedSrc;
       if (window.bhcocTrack) window.bhcocTrack('live_swap_triggered');
     }
-    wasLive = true;
   }
 
   function playInMainPlayer(videoId) {
+    viewingRecentVideo = true;
     var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
     if (!iframe) return;
     iframe.src = 'https://www.youtube.com/embed/' + videoId + '?autoplay=1';
@@ -50,6 +62,7 @@
   }
 
   function goBackToOriginal() {
+    viewingRecentVideo = false;
     var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
     if (!iframe || !originalSrc) return;
     iframe.src = originalSrc;
@@ -120,35 +133,55 @@
     videoSection.parentElement.insertBefore(wrap, videoSection.nextSibling);
   }
 
-  function enterServiceStreamPage() {
-    wasLive = false;
-    originalSrc = null;
+  function applyLiveCheck(data, isInitialLoad) {
+    cachedData = data;
 
-    function applyData(data) {
-      cachedData = data;
+    if (!viewingRecentVideo) {
       swapLiveVideo(data);
       var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
-      originalSrc = iframe ? iframe.src : null;
-      renderRecentVideos(data && data.recentVideos);
+      originalSrc = iframe ? iframe.src : originalSrc;
+    } else {
+      wasLive = !!(data && data.isLive);
     }
 
+    if (isInitialLoad) {
+      renderRecentVideos(data && data.recentVideos);
+    }
+  }
+
+  function checkLiveStatus(isInitialLoad) {
     fetch(WORKER_URL)
       .then(function (res) { return res.json(); })
-      .then(applyData)
+      .then(function (data) { applyLiveCheck(data, isInitialLoad); })
       .catch(function () {
         // Fail silently - leave the page exactly as Durable rendered it.
       });
   }
 
+  function enterServiceStreamPage() {
+    wasLive = false;
+    originalSrc = null;
+    viewingRecentVideo = false;
+    lastLiveCheckAt = Date.now();
+    checkLiveStatus(true);
+  }
+
   function syncToCurrentPage() {
     var path = window.location.pathname;
-    if (path === lastPath) return;
-    lastPath = path;
 
-    if (path === '/service-stream') {
-      enterServiceStreamPage();
-    } else {
-      removeRecentVideos();
+    if (path !== lastPath) {
+      lastPath = path;
+      if (path === '/service-stream') {
+        enterServiceStreamPage();
+      } else {
+        removeRecentVideos();
+      }
+      return;
+    }
+
+    if (path === '/service-stream' && Date.now() - lastLiveCheckAt >= LIVE_CHECK_INTERVAL_MS) {
+      lastLiveCheckAt = Date.now();
+      checkLiveStatus(false);
     }
   }
 

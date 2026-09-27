@@ -81,10 +81,12 @@ The Worker (`live-stream/worker.js`) does two things, both scoped to the church'
 2. **Recent uploads** — calls `playlistItems.list` on the channel's uploads playlist (cheap on API quota, unlike the live check) for the 3 most recent videos.
 
 The Footer Code script (`live-stream/durable-footer-snippet.html`), on `/service-stream` only:
-- Fetches the Worker's response.
+- Fetches the Worker's response on arrival, then keeps re-checking every 20 seconds for as long as someone stays on the page — not just once on arrival, which used to mean someone already sitting on the page when the stream actually started had to manually refresh to see it swap over.
 - If live, overwrites the existing YouTube iframe's `src` with the live video (normal `youtube.com/embed/VIDEO_ID` format — the same format that already worked for manual updates; a separate `youtube.com/embed/live_stream?channel=` trick was tried first and abandoned after extensive testing showed it's unreliable, likely due to a broader Dec 2025 YouTube referrer change).
-- Renders a "Recent Videos" row under the player from the 3 recent uploads. Clicking one plays it in the main player (no redirect to YouTube) and reveals a "← Back to Live Stream / Main Video" button that restores whatever was originally there.
+- Renders a "Recent Videos" row under the player from the 3 recent uploads (only on arrival, not on every 20-second re-check, so it doesn't get disruptively rebuilt while someone's browsing it). Clicking one plays it in the main player (no redirect to YouTube) and reveals a "← Back to Live Stream / Main Video" button that restores whatever was originally there — the periodic re-check leaves the player alone while someone's mid-recent-video, so it can't yank them back to the live stream out of nowhere, though it does keep the button's label current for when they return.
 - If nothing's live, does nothing — the Video block's static "waiting music" video just plays as normal.
+
+**A residual delay this doesn't remove:** the Worker's own response is cached for 5 minutes (see below), so even with this fix, the video can take up to ~5 minutes after the stream actually starts to swap over — the 20-second re-check just means it'll swap automatically once the Worker's cache catches up, instead of requiring a manual refresh indefinitely.
 
 **Why the Worker exists at all** instead of doing this client-side: Durable's page-editor blocks (Video block, "Embed object with code") both turned out to silently rewrite/strip any YouTube URL that isn't a plain `watch?v=`/`embed/VIDEO_ID` link — including dropping query strings entirely. That broke every attempt at a URL-only trick. The Worker sidesteps this by doing the real lookup server-side and only ever handing Durable a plain, well-formed embed URL.
 
