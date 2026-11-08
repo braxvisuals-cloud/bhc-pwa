@@ -20,8 +20,8 @@
 (function () {
   var WORKER_URL = 'https://bhcoclivecheck-98db.braxvisuals.workers.dev/';
   var LIVE_CHECK_INTERVAL_MS = 20000;
-  var waitingVideoSrc = null;
-  var originalSrc = null;
+  var WAITING_VIDEO_EMBED_SRC = 'https://www.youtube.com/embed/0tk6MUyEuTk';
+  var originalSrc = WAITING_VIDEO_EMBED_SRC;
   var wasLive = false;
   var viewingRecentVideo = false;
   var backButton = null;
@@ -125,12 +125,12 @@
             if (window.bhcocTrack) window.bhcocTrack('live_swap_triggered');
           }
           originalSrc = liveEmbedSrc;
-        } else if (waitingVideoSrc) {
-          if (iframe.src !== waitingVideoSrc) {
-            iframe.src = waitingVideoSrc;
+        } else {
+          if (iframe.src !== WAITING_VIDEO_EMBED_SRC) {
+            iframe.src = WAITING_VIDEO_EMBED_SRC;
             if (window.bhcocTrack) window.bhcocTrack('live_ended_reverted');
           }
-          originalSrc = waitingVideoSrc;
+          originalSrc = WAITING_VIDEO_EMBED_SRC;
         }
       }
     }
@@ -153,11 +153,7 @@
   function enterServiceStreamPage() {
     wasLive = false;
     viewingRecentVideo = false;
-    if (!waitingVideoSrc) {
-      var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
-      waitingVideoSrc = iframe ? iframe.src : null;
-    }
-    originalSrc = waitingVideoSrc;
+    originalSrc = WAITING_VIDEO_EMBED_SRC;
     lastLiveCheckAt = Date.now();
     checkLiveStatus(true);
   }
