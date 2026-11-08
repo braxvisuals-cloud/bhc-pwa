@@ -5,21 +5,31 @@
   On the /service-stream page only:
   1. Asks the Cloudflare Worker whether the channel is live right now. If
      yes, swaps the existing video iframe to the live video (normal
-     youtube.com/embed/VIDEO_ID format). If not, leaves the Video block's
-     current static video alone. Keeps re-checking every 20 seconds while
-     someone stays on the page, not just once on arrival - otherwise
+     youtube.com/embed/VIDEO_ID format). If the stream was live and just
+     ended, swaps back to the chosen waiting-music video automatically -
+     without this, the iframe is just left pointed at the now-ended live
+     video, which YouTube shows as "Video unavailable - this live stream
+     recording is not available." Keeps re-checking every 20 seconds
+     while someone stays on the page, not just once on arrival - otherwise
      someone already sitting on the page when the stream actually starts
-     would need to manually refresh to see it swap over. (The Worker's
-     own 5-minute response cache is a separate, lower-level delay this
-     doesn't change - see the README's troubleshooting section.)
+     (or ends) would need to manually refresh to see it swap over. (The
+     Worker's own 5-minute response cache is a separate, lower-level delay
+     this doesn't change - see the README's troubleshooting section.)
+
+     The "waiting video" to revert to is captured once, the first time
+     this page loads this visit, before any live-check happens - so it's
+     always Durable's true static default, never something this script
+     already swapped in.
   2. Renders a "Recent Videos" row of the channel's 3 latest uploads right
      under the video. Clicking one plays it in the main player above
      (stays on the site, no redirect to YouTube), and reveals a "Back to
-     Live Stream" / "Back to Main Video" button that restores whatever was
-     playing originally - no page refresh needed. While someone's watching
-     a recent video this way, the periodic re-check leaves the player
-     alone (doesn't yank them back to the live stream mid-video) - it just
-     keeps the "Back to..." button's label current for when they do return.
+     Live Stream" / "Back to Main Video" button that restores whatever the
+     main slot should currently be showing - no page refresh needed. While
+     someone's watching a recent video this way, the periodic re-check
+     leaves the player alone (doesn't yank them back to the live stream, or
+     revert them to the waiting video, mid-recent-video) - it just keeps
+     the "Back to..." button's label and destination current for when they
+     do return.
 
   Durable's site is a Next.js single-page app - clicking nav links doesn't
   reload the page, it swaps content in place. So this script polls the
@@ -31,6 +41,7 @@
 (function () {
   var WORKER_URL = 'https://bhcoclivecheck-98db.braxvisuals.workers.dev/';
   var LIVE_CHECK_INTERVAL_MS = 20000;
+  var waitingVideoSrc = null;
   var originalSrc = null;
   var wasLive = false;
   var viewingRecentVideo = false;
@@ -38,18 +49,6 @@
   var cachedData = null;
   var lastPath = null;
   var lastLiveCheckAt = 0;
-
-  function swapLiveVideo(data) {
-    wasLive = !!(data && data.isLive);
-    if (!wasLive || !data.videoId) return;
-    var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
-    if (!iframe) return;
-    var liveEmbedSrc = 'https://www.youtube.com/embed/' + data.videoId + '?autoplay=1';
-    if (iframe.src !== liveEmbedSrc) {
-      iframe.src = liveEmbedSrc;
-      if (window.bhcocTrack) window.bhcocTrack('live_swap_triggered');
-    }
-  }
 
   function playInMainPlayer(videoId) {
     viewingRecentVideo = true;
@@ -135,14 +134,28 @@
 
   function applyLiveCheck(data, isInitialLoad) {
     cachedData = data;
+    var isLiveNow = !!(data && data.isLive && data.videoId);
 
     if (!viewingRecentVideo) {
-      swapLiveVideo(data);
       var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
-      originalSrc = iframe ? iframe.src : originalSrc;
-    } else {
-      wasLive = !!(data && data.isLive);
+      if (iframe) {
+        if (isLiveNow) {
+          var liveEmbedSrc = 'https://www.youtube.com/embed/' + data.videoId + '?autoplay=1';
+          if (iframe.src !== liveEmbedSrc) {
+            iframe.src = liveEmbedSrc;
+            if (window.bhcocTrack) window.bhcocTrack('live_swap_triggered');
+          }
+          originalSrc = liveEmbedSrc;
+        } else if (waitingVideoSrc) {
+          if (iframe.src !== waitingVideoSrc) {
+            iframe.src = waitingVideoSrc;
+            if (window.bhcocTrack) window.bhcocTrack('live_ended_reverted');
+          }
+          originalSrc = waitingVideoSrc;
+        }
+      }
     }
+    wasLive = isLiveNow;
 
     if (isInitialLoad) {
       renderRecentVideos(data && data.recentVideos);
@@ -160,8 +173,12 @@
 
   function enterServiceStreamPage() {
     wasLive = false;
-    originalSrc = null;
     viewingRecentVideo = false;
+    if (!waitingVideoSrc) {
+      var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
+      waitingVideoSrc = iframe ? iframe.src : null;
+    }
+    originalSrc = waitingVideoSrc;
     lastLiveCheckAt = Date.now();
     checkLiveStatus(true);
   }

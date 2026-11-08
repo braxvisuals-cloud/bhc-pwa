@@ -20,6 +20,7 @@
 (function () {
   var WORKER_URL = 'https://bhcoclivecheck-98db.braxvisuals.workers.dev/';
   var LIVE_CHECK_INTERVAL_MS = 20000;
+  var waitingVideoSrc = null;
   var originalSrc = null;
   var wasLive = false;
   var viewingRecentVideo = false;
@@ -27,18 +28,6 @@
   var cachedData = null;
   var lastPath = null;
   var lastLiveCheckAt = 0;
-
-  function swapLiveVideo(data) {
-    wasLive = !!(data && data.isLive);
-    if (!wasLive || !data.videoId) return;
-    var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
-    if (!iframe) return;
-    var liveEmbedSrc = 'https://www.youtube.com/embed/' + data.videoId + '?autoplay=1';
-    if (iframe.src !== liveEmbedSrc) {
-      iframe.src = liveEmbedSrc;
-      if (window.bhcocTrack) window.bhcocTrack('live_swap_triggered');
-    }
-  }
 
   function playInMainPlayer(videoId) {
     viewingRecentVideo = true;
@@ -124,14 +113,28 @@
 
   function applyLiveCheck(data, isInitialLoad) {
     cachedData = data;
+    var isLiveNow = !!(data && data.isLive && data.videoId);
 
     if (!viewingRecentVideo) {
-      swapLiveVideo(data);
       var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
-      originalSrc = iframe ? iframe.src : originalSrc;
-    } else {
-      wasLive = !!(data && data.isLive);
+      if (iframe) {
+        if (isLiveNow) {
+          var liveEmbedSrc = 'https://www.youtube.com/embed/' + data.videoId + '?autoplay=1';
+          if (iframe.src !== liveEmbedSrc) {
+            iframe.src = liveEmbedSrc;
+            if (window.bhcocTrack) window.bhcocTrack('live_swap_triggered');
+          }
+          originalSrc = liveEmbedSrc;
+        } else if (waitingVideoSrc) {
+          if (iframe.src !== waitingVideoSrc) {
+            iframe.src = waitingVideoSrc;
+            if (window.bhcocTrack) window.bhcocTrack('live_ended_reverted');
+          }
+          originalSrc = waitingVideoSrc;
+        }
+      }
     }
+    wasLive = isLiveNow;
 
     if (isInitialLoad) {
       renderRecentVideos(data && data.recentVideos);
@@ -149,8 +152,12 @@
 
   function enterServiceStreamPage() {
     wasLive = false;
-    originalSrc = null;
     viewingRecentVideo = false;
+    if (!waitingVideoSrc) {
+      var iframe = document.querySelector('iframe[src*="youtube.com/embed/"]');
+      waitingVideoSrc = iframe ? iframe.src : null;
+    }
+    originalSrc = waitingVideoSrc;
     lastLiveCheckAt = Date.now();
     checkLiveStatus(true);
   }
